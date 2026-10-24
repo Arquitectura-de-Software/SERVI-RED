@@ -6,11 +6,13 @@ select * from no_plan();
 create function public.t_como(p_uid uuid) returns void language plpgsql as $$
 begin
   perform set_config('request.jwt.claims', json_build_object('sub', p_uid, 'role', 'authenticated')::text, true);
+  perform set_config('request.headers', '{"x-forwarded-for":"192.0.2.11"}', true);
   set local role authenticated;
 end $$;
 create function public.t_anon() returns void language plpgsql as $$
 begin
   perform set_config('request.jwt.claims', '{"role":"anon"}', true);
+  perform set_config('request.headers', '{"x-forwarded-for":"192.0.2.10"}', true);
   set local role anon;
 end $$;
 create function public.t_filas(p_sql text) returns bigint language plpgsql as $$
@@ -140,13 +142,13 @@ select is(
 
 select is(public.t_dml($$select public.registrar_denuncia('41000000-0000-0000-0000-000000000002'::uuid,
   public.t_serv('energia'), '11001', 'Descripcion suficientemente larga', 'corto')$$),
-  'error:22023', 'rechaza códigos de seguimiento cortos');
+  'error:PT400', 'rechaza códigos de seguimiento cortos');
 select is(public.t_dml($$select public.registrar_denuncia('41000000-0000-0000-0000-000000000003'::uuid,
   public.t_serv('energia'), null, 'Descripcion suficientemente larga', 'codigo-seguimiento-1234567890')$$),
-  'error:22023', 'rechaza denuncias sin municipio');
+  'error:PT400', 'rechaza denuncias sin municipio');
 select is(public.t_dml($$select public.registrar_denuncia('41000000-0000-0000-0000-000000000004'::uuid,
   public.t_serv('energia'), '11001', 'Descripcion suficientemente larga', 'codigo-seguimiento-1234567890', 95, -74)$$),
-  'error:22023', 'rechaza coordenadas fuera de rango');
+  'error:PT400', 'rechaza coordenadas fuera de rango');
 
 select is(public.t_filas($$select * from public.consultar_denuncia('codigo-seguimiento-1234567890')$$),
   1::bigint, 'el código correcto devuelve la denuncia');

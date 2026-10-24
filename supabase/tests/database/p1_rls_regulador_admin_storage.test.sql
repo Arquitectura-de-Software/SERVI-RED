@@ -6,6 +6,7 @@ select * from no_plan();
 create function public.t_como(p_uid uuid) returns void language plpgsql as $$
 begin
   perform set_config('request.jwt.claims', json_build_object('sub', p_uid, 'role', 'authenticated')::text, true);
+  perform set_config('request.headers', '{"x-forwarded-for":"192.0.2.13"}', true);
   set local role authenticated;
 end $$;
 create function public.t_anon() returns void language plpgsql as $$
