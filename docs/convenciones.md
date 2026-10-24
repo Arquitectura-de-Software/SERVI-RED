@@ -25,3 +25,12 @@ Se validan en la tabla transicion_incidente.
 ## Claves
 - anon key: pública, va en el frontend (por eso RLS es obligatorio).
 - service_role key: secreta, nunca en frontend ni en el repositorio.
+
+## PostGIS en la nube
+En el proyecto de Supabase en la nube, el esquema `extensions` no está en el
+search_path de las migraciones. Por eso, en migraciones y funciones, los tipos
+y funciones de PostGIS se escriben con prefijo:
+- extensions.geography(Point, 4326)
+- extensions.st_dwithin(...)
+Alternativa: fijar el search_path dentro de la función con
+`set search_path = public, extensions`.

@@ -8,7 +8,7 @@ create table incidente (
   servicio_id        smallint not null references servicio(id),
   empresa_id         uuid references empresa(id),
   municipio_codigo   char(5) references municipio(codigo_dane),
-  centroide          geography(Point, 4326),
+  centroide          extensions.geography(Point, 4326),
   estado             estado_incidente not null default 'recibido',
   prioridad          smallint not null default 3 check (prioridad between 1 and 5),
   operador_asignado  uuid references operador(id),
@@ -29,7 +29,7 @@ create table reporte (
   ciudadano_id       uuid references ciudadano(id) on delete set null,
   servicio_id        smallint not null references servicio(id),
   municipio_codigo   char(5) references municipio(codigo_dane),
-  ubicacion          geography(Point, 4326) not null, -- latitud/longitud del ER
+  ubicacion          extensions.geography(Point, 4326) not null, -- latitud/longitud del ER
   descripcion        text check (char_length(descripcion) <= 1000),
   url_evidencia      text,
   inicio_estimado    timestamptz,
@@ -48,7 +48,7 @@ create table confirmacion_ciudadana (
   incidente_id  uuid not null references incidente(id) on delete cascade,
   ciudadano_id  uuid not null references ciudadano(id) on delete cascade,
   tipo          tipo_confirmacion not null,
-  ubicacion     geography(Point, 4326),
+  ubicacion     extensions.geography(Point, 4326),
   creado_en     timestamptz not null default now(),
   unique (incidente_id, ciudadano_id, tipo)
 );
@@ -60,7 +60,7 @@ create table denuncia (
   client_request_id  uuid not null unique,
   servicio_id        smallint not null references servicio(id),
   municipio_codigo   char(5) references municipio(codigo_dane),
-  ubicacion_aprox    geography(Point, 4326),          -- opcional y aproximada
+  ubicacion_aprox    extensions.geography(Point, 4326),          -- opcional y aproximada
   descripcion        text not null check (char_length(descripcion) between 10 and 2000),
   url_evidencia      text,
   estado             estado_denuncia not null default 'recibida',
