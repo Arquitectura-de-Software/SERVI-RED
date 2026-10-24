@@ -36,6 +36,16 @@ Quién ve y hace qué (RLS activo en todas las tablas)
 - audit_log: solo lo lee admin. Lo escriben los triggers (incidente, validacion, respuesta, reporte, denuncia). Nunca guarda el hash de seguimiento.
 - evento_outbox: cerrada al cliente. Solo service_role.
 
+Eventos asíncronos (ADR-03)
+- `reporte.creado`: al insertar un reporte; payload con `reporte_id`, `servicio_id`, `municipio_codigo` y `creado_en`.
+- `reporte.estado_cambiado`: al cambiar el estado de un reporte; payload con el ID, estado anterior/nuevo e incidente asociado.
+- `incidente.estado_cambiado`: al cambiar el estado de un incidente; payload con el ID, servicio, municipio, estado anterior/nuevo y fecha del cambio.
+- `denuncia.estado_cambiado`: al cambiar el estado de una denuncia; payload con el ID, servicio, municipio, estado anterior/nuevo y fecha del cambio.
+- Los payloads no contienen identidad ciudadana, descripción, ubicación, evidencia ni código/hash de seguimiento. Cada fila tiene un `correlation_id` generado por el servidor.
+- El consumidor de confianza reclama hasta 100 eventos mediante `reclamar_eventos_outbox(limite, lease_segundos)`. El lease dura entre 30 y 900 segundos y permite reclamar de nuevo un evento si el consumidor se cae.
+- Tras cada fallo, se reintenta como máximo 5 veces, con espera exponencial de 15, 30, 60 y 120 segundos. El quinto fallo pasa a `fallido` (cola de fallos); `procesado` es terminal. El detalle del último error se limita a 1000 caracteres.
+- Solo `service_role` puede ejecutar las funciones de reclamar, confirmar procesamiento o registrar fallos. Los cambios de datos y su evento outbox se guardan en la misma transacción.
+
 Contrato de denuncias (Persona 3)
 - registrar_denuncia(p_client_request_id uuid, p_servicio_id smallint, p_municipio_codigo bpchar, p_descripcion text, p_codigo text, p_lat double precision default null, p_lng double precision default null, p_url_evidencia text default null) devuelve el uuid de la denuncia. No exige sesión. Reintentar con el mismo client_request_id devuelve la misma denuncia.
 - p_codigo lo genera el cliente (aleatorio, 16 o más caracteres) y lo guarda en el dispositivo. El servidor guarda solo su hash.
@@ -49,7 +59,7 @@ Storage (evidencias)
 - Orden: primero subir la foto, después crear la fila (reporte o denuncia). Hasta que exista la fila, nadie salvo admin ve la foto.
 
 Pruebas
-- Las pruebas de RLS están en supabase/tests/database (3 archivos, 148 pruebas). Se corren con: npx supabase test db
+- Las pruebas de base de datos están en supabase/tests/database. Se corren con: npx supabase test db
 - Si cambias una política o una tabla, corre las pruebas antes del Pull Request.
 
 Cómo arrancar (local)
