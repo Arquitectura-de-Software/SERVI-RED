@@ -24,7 +24,7 @@ Roles y sesiones
 - La cobertura de un operador sale de empresa_cobertura (empresa, servicio, municipio_codigo). No es geoespacial por ahora.
 
 Quién ve y hace qué (RLS activo en todas las tablas)
-- reporte: el ciudadano crea y ve los suyos. Al crear debe enviar ciudadano_id = su id, estado = recibido e incidente_id vacío. Un operador ve los reportes de servicios y municipios que cubre su empresa, y solo puede cambiar estado e incidente_id. Admin ve todo.
+- reporte: el ciudadano crea y ve los suyos. Para idempotencia usa `registrar_reporte()`; un operador ve los reportes de servicios y municipios que cubre su empresa, y solo puede cambiar estado e incidente_id. Admin ve todo.
 - Los reportes necesitan municipio_codigo para que un operador los vea. Por ahora lo envía el cliente. Rellenarlo desde la ubicación será de la Persona 2.
 - incidente: cualquier sesión lo ve. Un operador crea y gestiona los de su empresa y cobertura. Columnas editables: estado, prioridad, operador_asignado, inicio_en. Solo se puede asignar a operadores de la misma empresa.
 - Estados del incidente: recibido a en_atencion a restablecido a cerrado; además recibido a cerrado (descartar) y restablecido a en_atencion (reabrir). Cualquier otra transición falla con check_violation. Las fechas restablecido_en y cerrado_en las fija el trigger.
@@ -45,6 +45,13 @@ Eventos asíncronos (ADR-03)
 - El consumidor de confianza reclama hasta 100 eventos mediante `reclamar_eventos_outbox(limite, lease_segundos)`. El lease dura entre 30 y 900 segundos y permite reclamar de nuevo un evento si el consumidor se cae.
 - Tras cada fallo, se reintenta como máximo 5 veces, con espera exponencial de 15, 30, 60 y 120 segundos. El quinto fallo pasa a `fallido` (cola de fallos); `procesado` es terminal. El detalle del último error se limita a 1000 caracteres.
 - Solo `service_role` puede ejecutar las funciones de reclamar, confirmar procesamiento o registrar fallos. Los cambios de datos y su evento outbox se guardan en la misma transacción.
+
+Validación, idempotencia y anti-abuso (Fase 4)
+- `reporte.client_request_id` y `denuncia.client_request_id` son únicos. `registrar_reporte(...)` devuelve el reporte existente al reintentar la misma clave desde el mismo ciudadano; una clave usada por otro ciudadano devuelve conflicto HTTP 409. `registrar_denuncia(...)` conserva su comportamiento idempotente.
+- `registrar_reporte(p_client_request_id, p_servicio_id, p_municipio_codigo, p_lat, p_lng, p_descripcion, p_url_evidencia, p_inicio_estimado)` requiere sesión ciudadana; devuelve `reporte_id`, `estado`, `creado_en` y `correlation_id`.
+- `x-correlation-id` acepta un UUID. Si no se envía, la base genera uno por transacción; un valor mal formado se rechaza. Se propaga a eventos outbox, auditoría y respuesta de `registrar_reporte`.
+- La base responde con HTTP 429 al exceder: 5 reportes/minuto y 30/día por ciudadano, además de 20/minuto y 100/día por IP; 3 denuncias/10 minutos y 10/día por IP. Las llamadas públicas requieren una dirección de origen válida en los encabezados confiables del gateway (`cf-connecting-ip` o el último valor de `x-forwarded-for`).
+- Los contadores y las cuotas están en el esquema no expuesto `private`; los valores se ajustan con una migración/operación administrativa. La clave de sujeto se almacena como hash con sal interna y los buckets de más de un día se limpian durante las solicitudes. Las entradas inválidas se rechazan en la RPC y con constraints en la base.
 
 Contrato de denuncias (Persona 3)
 - registrar_denuncia(p_client_request_id uuid, p_servicio_id smallint, p_municipio_codigo bpchar, p_descripcion text, p_codigo text, p_lat double precision default null, p_lng double precision default null, p_url_evidencia text default null) devuelve el uuid de la denuncia. No exige sesión. Reintentar con el mismo client_request_id devuelve la misma denuncia.
