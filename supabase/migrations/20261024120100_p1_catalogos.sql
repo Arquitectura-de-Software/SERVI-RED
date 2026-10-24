@@ -11,7 +11,7 @@ create table municipio (
   codigo_dane           char(5) primary key,
   departamento_codigo   char(2) not null references departamento(codigo_dane),
   nombre                text not null,
-  geom                  geometry(MultiPolygon, 4326)   -- polígono municipal (se carga después)
+  geom                  extensions.geometry(MultiPolygon, 4326)   -- polígono municipal (se carga después)
 );
 create index municipio_departamento_idx on municipio (departamento_codigo);
 create index municipio_geom_gix on municipio using gist (geom);
