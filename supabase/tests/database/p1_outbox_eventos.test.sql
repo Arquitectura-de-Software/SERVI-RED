@@ -80,8 +80,8 @@ select ok(
 create temporary table eventos_reclamados on commit drop as
 select * from public.reclamar_eventos_outbox(10, 60);
 
-select is((select count(*) from eventos_reclamados), 4::bigint,
-  'el consumidor reclama los cuatro eventos disponibles');
+select is((select count(*) from eventos_reclamados), 5::bigint,
+  'el consumidor reclama los cinco eventos disponibles');
 select ok(
   (select bool_and(lease_token is not null and intentos = 1) from eventos_reclamados),
   'la reclamación crea un lease e incrementa intentos'

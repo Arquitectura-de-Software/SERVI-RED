@@ -225,12 +225,12 @@ declare
   i integer;
 begin
   for i in 1..20 loop
-    perform private.consumir_limite('reporte_ip', 'cuota-ip-prueba', 60, 20);
+    perform private.consumir_limite('prueba_cuota', 'cuota-ip-prueba', 60, 20);
   end loop;
 end;
 $$;
 select is(public.t_dml($$select private.consumir_limite(
-  'reporte_ip', 'cuota-ip-prueba', 60, 20
+  'prueba_cuota', 'cuota-ip-prueba', 60, 20
 )$$), 'error:PT429', 'la cuota por IP de reportes también bloquea el exceso');
 select ok(
   (select count(*) = 1
