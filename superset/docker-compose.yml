@@ -1,0 +1,59 @@
+name: servi-red-superset
+
+services:
+  superset-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: superset
+      POSTGRES_PASSWORD: ${METADATA_DB_PASSWORD}
+      POSTGRES_DB: superset
+    volumes:
+      - superset-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U superset -d superset"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  superset-init:
+    build: .
+    image: servi-red-superset:6.1.0
+    env_file: .env
+    environment:
+      SUPERSET_CONFIG_PATH: /app/superset_config.py
+    volumes:
+      - ./superset_config.py:/app/superset_config.py:ro
+    depends_on:
+      superset-db:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - >
+        superset db upgrade &&
+        (superset fab create-admin --username "$$ADMIN_USER" --firstname Admin --lastname SERVI-RED --email "$$ADMIN_EMAIL" --password "$$ADMIN_PASSWORD" || true) &&
+        superset init
+    restart: "no"
+
+  superset:
+    image: servi-red-superset:6.1.0
+    pull_policy: never
+    env_file: .env
+    environment:
+      SUPERSET_CONFIG_PATH: /app/superset_config.py
+    ports:
+      - "127.0.0.1:8088:8088"
+    volumes:
+      - ./superset_config.py:/app/superset_config.py:ro
+      - superset-home:/app/superset_home
+    depends_on:
+      superset-db:
+        condition: service_healthy
+      superset-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  superset-db-data:
+  superset-home:
