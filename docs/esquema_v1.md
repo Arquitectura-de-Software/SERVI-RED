@@ -40,17 +40,20 @@ Eventos asíncronos (ADR-03)
 - `reporte.creado`: al insertar un reporte; payload con `reporte_id`, `servicio_id`, `municipio_codigo` y `creado_en`.
 - `reporte.estado_cambiado`: al cambiar el estado de un reporte; payload con el ID, estado anterior/nuevo e incidente asociado.
 - `incidente.estado_cambiado`: al cambiar el estado de un incidente; payload con el ID, servicio, municipio, estado anterior/nuevo y fecha del cambio.
+- `denuncia.creada`: al registrar una denuncia; payload con `denuncia_id`, `servicio_id`, `municipio_codigo` y `creado_en`. Nunca lleva descripción, ubicación, evidencia ni hash.
 - `denuncia.estado_cambiado`: al cambiar el estado de una denuncia; payload con el ID, servicio, municipio, estado anterior/nuevo y fecha del cambio.
 - Los payloads no contienen identidad ciudadana, descripción, ubicación, evidencia ni código/hash de seguimiento. Cada fila tiene un `correlation_id` generado por el servidor.
 - El consumidor de confianza reclama hasta 100 eventos mediante `reclamar_eventos_outbox(limite, lease_segundos)`. El lease dura entre 30 y 900 segundos y permite reclamar de nuevo un evento si el consumidor se cae.
 - Tras cada fallo, se reintenta como máximo 5 veces, con espera exponencial de 15, 30, 60 y 120 segundos. El quinto fallo pasa a `fallido` (cola de fallos); `procesado` es terminal. El detalle del último error se limita a 1000 caracteres.
 - Solo `service_role` puede ejecutar las funciones de reclamar, confirmar procesamiento o registrar fallos. Los cambios de datos y su evento outbox se guardan en la misma transacción.
+- `reintentar_evento_outbox(id)` (solo service_role) devuelve un evento `fallido` a la cola con los intentos en cero.
+- Limpieza automática diaria con pg_cron (03:17 UTC): se borran los eventos `procesado` de más de 7 días y los `fallido` de más de 30. Los `pendiente` nunca se borran.
 
 Validación, idempotencia y anti-abuso (Fase 4)
 - `reporte.client_request_id` y `denuncia.client_request_id` son únicos. `registrar_reporte(...)` devuelve el reporte existente al reintentar la misma clave desde el mismo ciudadano; una clave usada por otro ciudadano devuelve conflicto HTTP 409. `registrar_denuncia(...)` conserva su comportamiento idempotente.
 - `registrar_reporte(p_client_request_id, p_servicio_id, p_municipio_codigo, p_lat, p_lng, p_descripcion, p_url_evidencia, p_inicio_estimado)` requiere sesión ciudadana; devuelve `reporte_id`, `estado`, `creado_en` y `correlation_id`.
 - `x-correlation-id` acepta un UUID. Si no se envía, la base genera uno por transacción; un valor mal formado se rechaza. Se propaga a eventos outbox, auditoría y respuesta de `registrar_reporte`.
-- La base responde con HTTP 429 al exceder: 5 reportes/minuto y 30/día por ciudadano, además de 20/minuto y 100/día por IP; 3 denuncias/10 minutos y 10/día por IP. Las llamadas públicas requieren una dirección de origen válida en los encabezados confiables del gateway (`cf-connecting-ip` o el último valor de `x-forwarded-for`).
+- La base responde con HTTP 429 al exceder: 5 reportes/minuto y 30/día por ciudadano, además de 60/minuto y 1000/día por IP; 3 denuncias/10 minutos y 10/día por IP. Las llamadas públicas requieren una dirección de origen válida en los encabezados confiables del gateway (`cf-connecting-ip` o el último valor de `x-forwarded-for`).
 - Los contadores y las cuotas están en el esquema no expuesto `private`; los valores se ajustan con una migración/operación administrativa. La clave de sujeto se almacena como hash con sal interna y los buckets de más de un día se limpian durante las solicitudes. Las entradas inválidas se rechazan en la RPC y con constraints en la base.
 
 Contrato de denuncias (Persona 3)
@@ -64,6 +67,26 @@ Storage (evidencias)
 - evidencias-reportes: la ruta debe ser <id_del_ciudadano>/<archivo>. La ruta exacta se guarda en reporte.url_evidencia. Lo leen su autor, los operadores que cubren ese reporte y admin.
 - evidencias-denuncias: nombre plano y aleatorio, sin carpetas. Se sube con una sesión anónima NUEVA, distinta de la que crea reportes, para no enlazar la denuncia con un ciudadano. La ruta se guarda en p_url_evidencia. Lo leen solo operadores que cubren la denuncia y admin.
 - Orden: primero subir la foto, después crear la fila (reporte o denuncia). Hasta que exista la fila, nadie salvo admin ve la foto.
+
+Métricas, datos abiertos y Superset (Fase 5)
+
+Esquemas
+- metrics: vistas de métricas operativas (Persona 1). Solo agregados, sin datos personales ni ubicaciones: reportes_por_dia, incidentes_abiertos, eventos_outbox, resumen_general.
+- open_data: vistas y vistas materializadas de datos abiertos (Persona 5). No están expuestos por la API; solo se leen con el rol open_data_reader.
+
+Roles de solo lectura (en Superset nunca se usan postgres ni service_role)
+- metrics_reader: lee solo el esquema metrics.
+- open_data_reader: lee solo el esquema open_data. Lo que se cree después en open_data queda legible por defecto. Persona 5: al crear tu primera vista materializada, verifica con select has_table_privilege('open_data_reader', 'open_data.<tu_vista>', 'select'); debe dar true.
+- Ambos roles son de solo lectura, tienen statement_timeout de 30 s y máximo 10 conexiones. Las contraseñas no están en el repositorio: la Persona 1 las puso en la nube con \password desde psql. Si necesitas una, pídesela a la Persona 1.
+- Conexión a la nube: pooler en modo session (puerto 5432), usuario <rol>.<ref_del_proyecto> y sslmode=require. La conexión directa del plan gratuito solo funciona por IPv6.
+
+Superset
+- Carpeta superset/ (Docker). La guía está en superset/README.txt. Corre en http://localhost:8088 en la máquina de la Persona 1.
+- Dashboard de métricas operativas: superset/dashboards/dashboard_metricas.zip. Se importa desde Dashboards, Import; pide la contraseña de metrics_reader.
+- Los dashboards públicos y los de reguladores son de la Persona 5 y se conectan con open_data_reader.
+
+Datos de demostración
+- En la nube hay datos de demo cuyos ids empiezan por de0de0de-. Se borran con docs/limpiar_datos_demo.sql. No usar esos ids para otra cosa.
 
 Pruebas
 - Las pruebas de base de datos están en supabase/tests/database. Se corren con: npx supabase test db
@@ -90,3 +113,4 @@ Reglas del equipo
 6. En migraciones y funciones, los tipos y funciones de PostGIS se escriben con prefijo extensions. (ver docs/convenciones.md). Lo mismo para extensions.digest.
 7. Si necesitas cambiar una tabla de otra persona o del núcleo (reporte, incidente, denuncia), se lo pides a la Persona 1 antes de tocarla.
 8. En PowerShell usar curl.exe, no curl.
+9. Excepciones a la regla 1, solo para la Persona 1: poner contraseñas a roles (con \password desde psql) y cargar o borrar datos de demostración.
