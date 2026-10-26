@@ -1,0 +1,188 @@
+{
+  "info": {
+    "_postman_id": "servi-red-api-collection-v1",
+    "name": "SERVI-RED — API Collection",
+    "description": "Colección completa de endpoints para la App Móvil Ciudadana SERVI-RED.\nIncluye: Reportes (RF-01), Restablecimiento (RF-02), Validación Comunitaria (RF-03), Denuncias Anónimas (RF-04), Seguimiento (RF-05), Notificaciones (RF-06).\n\nADR-01: Supabase REST API (PostgREST)\nADR-02: Sin autenticación obligatoria (RLS público)\nADR-05: Consultas espaciales PostGIS",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "SUPABASE_URL",      "value": "https://YOUR_PROJECT_ID.supabase.co", "type": "string" },
+    { "key": "SUPABASE_ANON_KEY", "value": "YOUR_ANON_KEY",                       "type": "string" },
+    { "key": "reporte_id",        "value": "RPT-2024-001",                         "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "📢 RF-01 — Insertar Reporte de Corte",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "apikey",        "value": "{{SUPABASE_ANON_KEY}}" },
+          { "key": "Authorization", "value": "Bearer {{SUPABASE_ANON_KEY}}" },
+          { "key": "Content-Type",  "value": "application/json" },
+          { "key": "Prefer",        "value": "return=representation" }
+        ],
+        "url": { "raw": "{{SUPABASE_URL}}/rest/v1/reportes", "host": ["{{SUPABASE_URL}}"], "path": ["rest","v1","reportes"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_request_id\": \"{{$guid}}\",\n  \"tipo_servicio\": \"energia\",\n  \"descripcion\": \"Apagón total en el barrio desde las 7am sin aviso previo\",\n  \"municipio\": \"Bogotá D.C.\",\n  \"hora_inicio\": \"07:00\",\n  \"magnitud_area\": \"barrio\",\n  \"latitud\": 4.71099,\n  \"longitud\": -74.07211,\n  \"foto_url\": null\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "description": "Inserta un nuevo reporte de interrupción.\n\n**Idempotencia (RNF-22):** El campo `client_request_id` (UUID único) evita duplicados si el cliente reintenta la petición.\n\n**Offline Queue:** Si no hay conexión, la app guarda el payload en localStorage y reintenta al reconectarse.\n\n**PostGIS:** El trigger `trg_sync_reporte_geom` convierte lat/lng a `GEOGRAPHY(POINT)` para consultas espaciales."
+      },
+      "response": [
+        {
+          "name": "201 Created — Reporte registrado",
+          "status": "Created",
+          "code": 201,
+          "body": "[{\"id\":\"RPT-2024-001\",\"client_request_id\":\"uuid-here\",\"tipo_servicio\":\"energia\",\"descripcion\":\"Apagón total...\",\"estado\":\"recibido\",\"confirmaciones\":0,\"created_at\":\"2024-01-15T07:00:00Z\"}]"
+        }
+      ]
+    },
+    {
+      "name": "🔍 RF-01 — Obtener Reporte por ID (RF-05)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "apikey",        "value": "{{SUPABASE_ANON_KEY}}" },
+          { "key": "Authorization", "value": "Bearer {{SUPABASE_ANON_KEY}}" }
+        ],
+        "url": {
+          "raw": "{{SUPABASE_URL}}/rest/v1/reportes?id=eq.{{reporte_id}}&select=*,timeline_eventos(*)",
+          "host": ["{{SUPABASE_URL}}"],
+          "path": ["rest","v1","reportes"],
+          "query": [
+            { "key": "id",     "value": "eq.{{reporte_id}}" },
+            { "key": "select", "value": "*,timeline_eventos(*)" }
+          ]
+        },
+        "description": "Consulta el estado de un reporte por su ID de trazabilidad. Incluye la línea de tiempo completa de eventos. Sin autenticación (RLS público)."
+      }
+    },
+    {
+      "name": "🗺️ RF-03 — Reportes Cercanos (PostGIS ST_DWithin)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "apikey",        "value": "{{SUPABASE_ANON_KEY}}" },
+          { "key": "Authorization", "value": "Bearer {{SUPABASE_ANON_KEY}}" },
+          { "key": "Content-Type",  "value": "application/json" }
+        ],
+        "url": { "raw": "{{SUPABASE_URL}}/rest/v1/rpc/get_reportes_cercanos", "host": ["{{SUPABASE_URL}}"], "path": ["rest","v1","rpc","get_reportes_cercanos"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"p_lat\": 4.71099,\n  \"p_lng\": -74.07211,\n  \"p_radio_metros\": 2000\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "description": "Llama a la función RPC `get_reportes_cercanos` que usa `ST_DWithin` de PostGIS para detectar e integrar reportes ciudadanos en un radio dado. Se usa para el filtro anti-duplicados y la vista de comunidad."
+      }
+    },
+    {
+      "name": "👍 RF-03 — Confirmar Reporte (Validación Comunitaria)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "apikey",        "value": "{{SUPABASE_ANON_KEY}}" },
+          { "key": "Authorization", "value": "Bearer {{SUPABASE_ANON_KEY}}" },
+          { "key": "Content-Type",  "value": "application/json" }
+        ],
+        "url": { "raw": "{{SUPABASE_URL}}/rest/v1/rpc/confirmar_reporte", "host": ["{{SUPABASE_URL}}"], "path": ["rest","v1","rpc","confirmar_reporte"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"p_reporte_id\": \"{{reporte_id}}\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "description": "Incrementa el contador de confirmaciones de un reporte. Si supera el umbral (5 confirmaciones), el sistema calcula la duración del corte automáticamente y marca el reporte como resuelto."
+      }
+    },
+    {
+      "name": "✅ RF-02 — Notificar Restablecimiento",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "apikey",        "value": "{{SUPABASE_ANON_KEY}}" },
+          { "key": "Authorization", "value": "Bearer {{SUPABASE_ANON_KEY}}" },
+          { "key": "Content-Type",  "value": "application/json" }
+        ],
+        "url": { "raw": "{{SUPABASE_URL}}/rest/v1/rpc/notificar_restablecimiento", "host": ["{{SUPABASE_URL}}"], "path": ["rest","v1","rpc","notificar_restablecimiento"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"p_reporte_id\": \"{{reporte_id}}\",\n  \"p_lat\": 4.71099,\n  \"p_lng\": -74.07211\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "description": "Notifica que el servicio fue restablecido. Actualiza el estado a 'resuelto' y calcula la duración total de la interrupción para los indicadores de continuidad (SSPD/CRA)."
+      }
+    },
+    {
+      "name": "🚨 RF-04 — Enviar Denuncia Anónima",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "apikey",        "value": "{{SUPABASE_ANON_KEY}}" },
+          { "key": "Authorization", "value": "Bearer {{SUPABASE_ANON_KEY}}" },
+          { "key": "Content-Type",  "value": "application/json" },
+          { "key": "Prefer",        "value": "return=representation" }
+        ],
+        "url": { "raw": "{{SUPABASE_URL}}/rest/v1/denuncias_anonimas", "host": ["{{SUPABASE_URL}}"], "path": ["rest","v1","denuncias_anonimas"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_request_id\": \"{{$guid}}\",\n  \"tipo_fraude\": \"conexion_clandestina\",\n  \"servicio\": \"energia\",\n  \"descripcion\": \"Se observó una derivación directa del cableado de la red eléctrica sin medidor\",\n  \"municipio\": \"Medellín\",\n  \"latitud\": 6.24,\n  \"longitud\": -75.58\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "description": "Envía una denuncia anónima de fraude. NO se incluye ningún dato personal (sin user_id, sin email).\n\n**Privacidad por Diseño (ADR-02):**\n- Coordenadas redondeadas a 2 decimales (±1km)\n- RLS permite INSERT sin autenticación\n- Sin SELECT policy para usuarios anónimos\n- La denuncia entra a cola de moderación antes de ser transmitida al operador"
+      }
+    },
+    {
+      "name": "📡 RF-06 — Listar Eventos del Outbox",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "apikey",        "value": "{{SUPABASE_ANON_KEY}}" },
+          { "key": "Authorization", "value": "Bearer {{SUPABASE_ANON_KEY}}" }
+        ],
+        "url": {
+          "raw": "{{SUPABASE_URL}}/rest/v1/outbox_eventos?estado=eq.pendiente&order=created_at.asc&limit=20",
+          "host": ["{{SUPABASE_URL}}"],
+          "path": ["rest","v1","outbox_eventos"],
+          "query": [
+            { "key": "estado", "value": "eq.pendiente" },
+            { "key": "order",  "value": "created_at.asc" },
+            { "key": "limit",  "value": "20" }
+          ]
+        },
+        "description": "Consulta eventos pendientes en la tabla outbox. Útil para monitorear el patrón Outbox (ADR-03) y verificar que la Edge Function process-notifications está procesando correctamente."
+      }
+    },
+    {
+      "name": "⚡ RF-06 — Trigger Edge Function (Notificaciones)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{SUPABASE_ANON_KEY}}" },
+          { "key": "Content-Type",  "value": "application/json" }
+        ],
+        "url": { "raw": "{{SUPABASE_URL}}/functions/v1/process-notifications", "host": ["{{SUPABASE_URL}}"], "path": ["functions","v1","process-notifications"] },
+        "body": { "mode": "raw", "raw": "{}", "options": { "raw": { "language": "json" } } },
+        "description": "Invoca manualmente la Edge Function de procesamiento de notificaciones. En producción, esta función es invocada cada 2 minutos via cron."
+      }
+    },
+    {
+      "name": "🔄 Idempotencia — Reenvío del mismo reporte (debe ignorar)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "apikey",        "value": "{{SUPABASE_ANON_KEY}}" },
+          { "key": "Authorization", "value": "Bearer {{SUPABASE_ANON_KEY}}" },
+          { "key": "Content-Type",  "value": "application/json" },
+          { "key": "Prefer",        "value": "resolution=ignore-duplicates,return=representation" }
+        ],
+        "url": { "raw": "{{SUPABASE_URL}}/rest/v1/reportes", "host": ["{{SUPABASE_URL}}"], "path": ["rest","v1","reportes"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_request_id\": \"mismo-uuid-que-el-primer-envio\",\n  \"tipo_servicio\": \"energia\",\n  \"descripcion\": \"Apagón total en el barrio desde las 7am sin aviso previo\",\n  \"municipio\": \"Bogotá D.C.\",\n  \"hora_inicio\": \"07:00\",\n  \"magnitud_area\": \"barrio\",\n  \"latitud\": 4.71099,\n  \"longitud\": -74.07211\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "description": "Prueba de idempotencia (RNF-22). Al enviar el mismo `client_request_id`, el header `Prefer: resolution=ignore-duplicates` junto con la constraint UNIQUE en la columna hace que el backend ignore el duplicado sin error. El cliente recibe respuesta 200 vacía."
+      }
+    }
+  ]
+}
