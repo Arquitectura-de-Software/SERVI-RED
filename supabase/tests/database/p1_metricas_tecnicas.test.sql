@@ -1,6 +1,19 @@
+select 1 as sonda_visible;
+select 1 as sonda_visible;
+select 1 as sonda_visible;
+select 1 as sonda_visible;
+select 1 as sonda_visible;
+select 1 as sonda_password;
+select 1 as sonda_password;
+select 1 as sonda_password;
+select 1 as sonda_password;
+select 1 as sonda_password;
+
 begin;
 create extension if not exists pgtap with schema extensions;
 select * from no_plan();
+select diag('Rol del runner: ' || current_user || ' | consultas con texto oculto: ' ||
+  (select count(*) from extensions.pg_stat_statements where query like '<insufficient%'));
 
 create function public.t_rol(p_rol text, p_sql text) returns text language plpgsql as $$
 declare n bigint;
@@ -35,22 +48,10 @@ select ok((select storage_mb >= 3 and archivos >= 2 from metrics.uso_recursos), 
 
 -- ---------- consultas lentas ----------
 -- Cada sentencia se repite 5 veces para superar el filtro de "al menos 5 llamadas".
-select 1 as sonda_visible;
-select 1 as sonda_visible;
-select 1 as sonda_visible;
-select 1 as sonda_visible;
-select 1 as sonda_visible;
-select 1 as sonda_password;
-select 1 as sonda_password;
-select 1 as sonda_password;
-select 1 as sonda_password;
-select 1 as sonda_password;
 
 select lives_ok($$select * from private.consultas_lentas(1000)$$, 'la función de consultas lentas se ejecuta');
-select * from todo_start('Pendiente: verificar la visibilidad de pg_stat_statements fuera de la transaccion del test');
 select ok(exists (select 1 from private.consultas_lentas(100000) where consulta ilike '%sonda_visible%'),
   'una consulta normal con 5 o más llamadas aparece');
-select * from todo_end();
 select ok(not exists (select 1 from private.consultas_lentas(100000) where consulta ilike '%sonda_password%'),
   'las consultas que mencionan contraseñas nunca aparecen');
 select ok(not exists (select 1 from private.consultas_lentas(100000) where length(consulta) > 200),
