@@ -1,0 +1,19 @@
+/build
+# Gradle / Archivos de compilación de Android
+.gradle/
+build/
+**/build/
+app/build/
+*.apk
+*.ap_
+
+# Archivos de configuración del IDE (Android Studio / IntelliJ)
+.idea/
+*.iml
+.DS_Store
+captures/
+
+# Claves de API y configuraciones locales
+local.properties
+secrets.properties
+google-services.json
