@@ -37,7 +37,6 @@ android {
 }
 
 dependencies {
-    implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
@@ -52,4 +51,18 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    // 1. Geolocalización (GPS)
+    implementation("com.google.android.gms:play-services-location:21.4.0")
+
+    // 2. OpenStreetMap para Kotlin (osmdroid)
+    implementation("org.osmdroid:osmdroid-android:6.1.18")
+
+    // 3. Cliente HTTP / Supabase SDK y Serialización JSON
+    implementation("io.ktor:ktor-client-android:3.6.1")
+    implementation("io.ktor:ktor-client-content-negotiation:3.6.1")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.6.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+
+    // 4. Carga de imágenes (para fotos de evidencia)
+    implementation("io.coil-kt:coil-compose:2.7.0")
 }
