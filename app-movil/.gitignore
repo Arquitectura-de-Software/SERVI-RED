@@ -1,0 +1,15 @@
+# Gradle y carpetas de compilación
+.gradle/
+build/
+**/build/
+app/build/
+
+# Archivos de Android Studio / IntelliJ
+.idea/
+*.iml
+.DS_Store
+
+# Credenciales y propiedades locales
+local.properties
+secrets.properties
+google-services.json
