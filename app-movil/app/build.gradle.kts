@@ -1,6 +1,9 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.google.services)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -51,18 +54,40 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
-    // 1. Geolocalización (GPS)
+
+    // Geolocalización
     implementation("com.google.android.gms:play-services-location:21.4.0")
 
-    // 2. OpenStreetMap para Kotlin (osmdroid)
+    // OpenStreetMap
     implementation("org.osmdroid:osmdroid-android:6.1.18")
 
-    // 3. Cliente HTTP / Supabase SDK y Serialización JSON
+    // HTTP + serialización
     implementation("io.ktor:ktor-client-android:3.6.1")
     implementation("io.ktor:ktor-client-content-negotiation:3.6.1")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.6.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+    // WebSocket para Supabase Realtime (InAppNotificationManager)
+    implementation("io.ktor:ktor-client-websockets:3.6.1")
 
-    // 4. Carga de imágenes (para fotos de evidencia)
+    // Carga de imágenes
     implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Room - base de datos local para modo offline
+    implementation("androidx.room:room-runtime:2.7.1")
+    implementation("androidx.room:room-ktx:2.7.1")
+    ksp("androidx.room:room-compiler:2.7.1")
+
+    // WorkManager - cola de sincronización con reintentos exponenciales
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
+
+    // FCM - notificaciones push
+    implementation(platform("com.google.firebase:firebase-bom:33.14.0"))
+    implementation("com.google.firebase:firebase-messaging-ktx")
+
+    // Navigation Compose
+    implementation("androidx.navigation:navigation-compose:2.9.0")
+
+    // ViewModel + Compose
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.1")
 }
