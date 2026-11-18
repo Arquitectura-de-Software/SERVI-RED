@@ -60,7 +60,7 @@ class DenunciaRepositoryImpl(
                 lat = lat,
                 lng = lng,
                 descripcion = descripcion,
-                seguimientoHash = seguimientoHash
+                codigo = codigoSeguimiento
             )
             val resultado = SupabaseClient.registrarDenuncia(dto)
             if (resultado.isSuccess) {
@@ -89,23 +89,30 @@ class DenunciaRepositoryImpl(
             return Result.failure(Exception("Sin conexión y sin datos locales para este código"))
         }
 
-        return SupabaseClient.consultarDenunciaPorHash(hash).map { dto ->
+        return SupabaseClient.consultarDenunciaPorCodigo(codigoSeguimiento).map { res ->
             Denuncia(
                 id = "",
-                clientRequestId = dto.clientRequestId,
-                servicio = TipoServicio.entries.getOrNull(dto.servicioId - 1) ?: TipoServicio.ENERGIA,
-                municipioCodigo = dto.municipioCodigo,
-                lat = dto.lat,
-                lng = dto.lng,
-                descripcion = dto.descripcion,
+                clientRequestId = "",
+                servicio = TipoServicio.ENERGIA,
+                municipioCodigo = "",
+                lat = null,
+                lng = null,
+                descripcion = "Denuncia anónima registrada",
                 codigoSeguimiento = codigoSeguimiento,
                 seguimientoHash = hash,
-                estado = "recibida",
+                estado = res.estado,
                 pendienteSync = false,
-                creadoEn = System.currentTimeMillis(),
+                creadoEn = parsearFechaIso(res.creadaEn),
                 intentos = 0
             )
         }
+    }
+
+    private fun parsearFechaIso(fecha: String?): Long {
+        if (fecha.isNullOrBlank()) return System.currentTimeMillis()
+        return runCatching {
+            java.time.Instant.parse(fecha).toEpochMilli()
+        }.getOrDefault(System.currentTimeMillis())
     }
 
     private suspend fun sha256(input: String): String = withContext(Dispatchers.Default) {

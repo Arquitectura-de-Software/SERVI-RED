@@ -3,8 +3,10 @@ package com.servired.app.core.data.remote
 import android.content.Context
 import com.servired.app.BuildConfig
 import com.servired.app.core.data.local.SessionManager
+import com.servired.app.core.data.remote.dto.ConsultaDenunciaDto
+import com.servired.app.core.data.remote.dto.ConsultaDenunciaResponseDto
 import com.servired.app.core.data.remote.dto.DenunciaDto
-import com.servired.app.core.data.remote.dto.DenunciaResponseDto
+import com.servired.app.core.data.remote.dto.ReporteDetalleDto
 import com.servired.app.core.data.remote.dto.ReporteDto
 import com.servired.app.core.data.remote.dto.ReporteResponseDto
 import io.ktor.client.HttpClient
@@ -130,9 +132,14 @@ object SupabaseClient {
                 setBody(dto)
             }
             if (response.status == HttpStatusCode.OK || response.status == HttpStatusCode.Created) {
-                response.body<ReporteResponseDto>()
+                val bodyText = response.body<String>()
+                if (bodyText.trimStart().startsWith("[")) {
+                    json.decodeFromString<List<ReporteResponseDto>>(bodyText).first()
+                } else {
+                    json.decodeFromString<ReporteResponseDto>(bodyText)
+                }
             } else {
-                throw Exception("Error HTTP ${response.status.value} al registrar reporte")
+                throw Exception("Error HTTP ${response.status.value} al registrar reporte: ${response.body<String>()}")
             }
         }.onFailure { e ->
             Result.failure<ReporteResponseDto>(Exception("Error de red: ${e.message}", e))
@@ -146,16 +153,17 @@ object SupabaseClient {
                 setBody(dto)
             }
             if (response.status == HttpStatusCode.OK || response.status == HttpStatusCode.Created) {
-                response.body<DenunciaResponseDto>().id
+                // PostgREST devuelve el UUID como un string JSON plano: "xxxx-xxxx-..."
+                response.body<String>().trim().trim('"')
             } else {
-                throw Exception("Error HTTP ${response.status.value} al registrar denuncia")
+                throw Exception("Error HTTP ${response.status.value} al registrar denuncia: ${response.body<String>()}")
             }
         }.onFailure { e ->
             Result.failure<String>(Exception("Error de red: ${e.message}", e))
         }
     }
 
-    suspend fun consultarReporte(reporteId: String): Result<ReporteDto> {
+    suspend fun consultarReporte(reporteId: String): Result<ReporteDetalleDto> {
         return runCatching {
             val response = httpClient.get("$SUPABASE_URL/rest/v1/reporte") {
                 parameter("id", "eq.$reporteId")
@@ -163,31 +171,31 @@ object SupabaseClient {
                 parameter("limit", "1")
             }
             if (response.status == HttpStatusCode.OK) {
-                val list = response.body<List<ReporteDto>>()
+                val list = response.body<List<ReporteDetalleDto>>()
                 list.firstOrNull() ?: throw Exception("Reporte no encontrado")
             } else {
-                throw Exception("Error HTTP ${response.status.value} al consultar reporte")
+                throw Exception("Error HTTP ${response.status.value} al consultar reporte: ${response.body<String>()}")
             }
         }.onFailure { e ->
-            Result.failure<ReporteDto>(Exception("Error de red: ${e.message}", e))
+            Result.failure<ReporteDetalleDto>(Exception("Error de red: ${e.message}", e))
         }
     }
 
-    suspend fun consultarDenunciaPorHash(hash: String): Result<DenunciaDto> {
+    // Consulta el estado de una denuncia mediante la función RPC segura sin violar RLS
+    suspend fun consultarDenunciaPorCodigo(codigo: String): Result<ConsultaDenunciaResponseDto> {
         return runCatching {
-            val response = httpClient.get("$SUPABASE_URL/rest/v1/denuncia") {
-                parameter("seguimiento_hash", "eq.$hash")
-                parameter("select", "*")
-                parameter("limit", "1")
+            val response = httpClient.post("$SUPABASE_URL/rest/v1/rpc/consultar_denuncia") {
+                contentType(ContentType.Application.Json)
+                setBody(ConsultaDenunciaDto(codigo = codigo))
             }
             if (response.status == HttpStatusCode.OK) {
-                val list = response.body<List<DenunciaDto>>()
-                list.firstOrNull() ?: throw Exception("Denuncia no encontrada")
+                val list = response.body<List<ConsultaDenunciaResponseDto>>()
+                list.firstOrNull() ?: throw Exception("Denuncia no encontrada o código incorrecto")
             } else {
-                throw Exception("Error HTTP ${response.status.value} al consultar denuncia")
+                throw Exception("Error HTTP ${response.status.value} al consultar denuncia: ${response.body<String>()}")
             }
         }.onFailure { e ->
-            Result.failure<DenunciaDto>(Exception("Error de red: ${e.message}", e))
+            Result.failure<ConsultaDenunciaResponseDto>(Exception("Error de red: ${e.message}", e))
         }
     }
 }

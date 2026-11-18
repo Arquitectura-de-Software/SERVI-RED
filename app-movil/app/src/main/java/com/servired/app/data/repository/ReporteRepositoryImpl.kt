@@ -94,19 +94,26 @@ class ReporteRepositoryImpl(
         SupabaseClient.asegurarSesion(context)
         return SupabaseClient.consultarReporte(id).map { dto ->
             Reporte(
-                id = id,
-                clientRequestId = "",
+                id = dto.id,
+                clientRequestId = dto.clientRequestId,
                 servicio = TipoServicio.entries.getOrNull(dto.servicioId - 1) ?: TipoServicio.ENERGIA,
                 municipioCodigo = dto.municipioCodigo,
-                lat = dto.lat,
-                lng = dto.lng,
+                lat = local?.lat ?: 0.0,
+                lng = local?.lng ?: 0.0,
                 descripcion = dto.descripcion,
-                estado = "recibido",
+                estado = dto.estado,
                 pendienteSync = false,
-                creadoEn = System.currentTimeMillis(),
+                creadoEn = parsearFechaIso(dto.creadoEn),
                 intentosSincronizacion = 0
             )
         }
+    }
+
+    private fun parsearFechaIso(fecha: String?): Long {
+        if (fecha.isNullOrBlank()) return System.currentTimeMillis()
+        return runCatching {
+            java.time.Instant.parse(fecha).toEpochMilli()
+        }.getOrDefault(System.currentTimeMillis())
     }
 
     private fun ReporteEntity.toDomain() = Reporte(

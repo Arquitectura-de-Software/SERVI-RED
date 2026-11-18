@@ -68,7 +68,7 @@ class OutboxSyncWorker(
                 lat = denuncia.lat,
                 lng = denuncia.lng,
                 descripcion = denuncia.descripcion,
-                seguimientoHash = denuncia.seguimientoHash
+                codigo = denuncia.codigoSeguimiento
             )
 
             val resultado = SupabaseClient.registrarDenuncia(dto)

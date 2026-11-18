@@ -5,17 +5,23 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class DenunciaDto(
-    @SerialName("client_request_id") val clientRequestId: String,
-    @SerialName("servicio_id") val servicioId: Int,
-    @SerialName("municipio_codigo") val municipioCodigo: String,
-    val lat: Double? = null,
-    val lng: Double? = null,
-    val descripcion: String,
-    @SerialName("seguimiento_hash") val seguimientoHash: String
+    @SerialName("p_client_request_id") val clientRequestId: String,
+    @SerialName("p_servicio_id") val servicioId: Int,
+    @SerialName("p_municipio_codigo") val municipioCodigo: String,
+    @SerialName("p_descripcion") val descripcion: String,
+    @SerialName("p_codigo") val codigo: String,
+    @SerialName("p_lat") val lat: Double? = null,
+    @SerialName("p_lng") val lng: Double? = null,
+    @SerialName("p_url_evidencia") val urlEvidencia: String? = null
 )
 
 @Serializable
-data class DenunciaResponseDto(
-    val id: String,
-    val estado: String
+data class ConsultaDenunciaDto(
+    @SerialName("p_codigo") val codigo: String
+)
+
+@Serializable
+data class ConsultaDenunciaResponseDto(
+    val estado: String,
+    @SerialName("creada_en") val creadaEn: String? = null
 )
