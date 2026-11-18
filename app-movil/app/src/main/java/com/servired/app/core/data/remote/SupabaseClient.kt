@@ -1,5 +1,6 @@
 package com.servired.app.core.data.remote
 
+import com.servired.app.BuildConfig
 import com.servired.app.core.data.remote.dto.DenunciaDto
 import com.servired.app.core.data.remote.dto.DenunciaResponseDto
 import com.servired.app.core.data.remote.dto.ReporteDto
@@ -18,12 +19,33 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 object SupabaseClient {
 
-    private const val SUPABASE_URL = "https://your-project.supabase.co"
-    private const val SUPABASE_ANON_KEY = "your-anon-key"
+    val SUPABASE_URL: String get() = BuildConfig.SUPABASE_URL
+    val SUPABASE_ANON_KEY: String get() = BuildConfig.SUPABASE_ANON_KEY
+
+    @Volatile
+    private var accessToken: String? = null
+
+    @Volatile
+    private var currentUserId: String? = null
+
+    fun setSession(token: String, userId: String?) {
+        accessToken = token
+        currentUserId = userId
+    }
+
+    fun getAccessToken(): String? = accessToken
+    fun getCurrentUserId(): String? = currentUserId
+
+    private fun getAuthHeader(): String {
+        val token = accessToken
+        return if (!token.isNullOrBlank()) "Bearer $token" else "Bearer $SUPABASE_ANON_KEY"
+    }
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -36,7 +58,37 @@ object SupabaseClient {
         }
         defaultRequest {
             header("apikey", SUPABASE_ANON_KEY)
-            header("Authorization", "Bearer $SUPABASE_ANON_KEY")
+            header("Authorization", getAuthHeader())
+        }
+    }
+
+    @Serializable
+    data class AuthResponse(
+        @SerialName("access_token") val accessToken: String,
+        @SerialName("token_type") val tokenType: String? = null,
+        val user: AuthUser? = null
+    )
+
+    @Serializable
+    data class AuthUser(
+        val id: String
+    )
+
+    suspend fun iniciarSesionAnonima(): Result<String> {
+        return runCatching {
+            val response = httpClient.post("$SUPABASE_URL/auth/v1/signup") {
+                contentType(ContentType.Application.Json)
+                setBody("{}")
+            }
+            if (response.status == HttpStatusCode.OK || response.status == HttpStatusCode.Created) {
+                val authData = response.body<AuthResponse>()
+                setSession(authData.accessToken, authData.user?.id)
+                authData.accessToken
+            } else {
+                throw Exception("Error HTTP ${response.status.value} al autenticar anónimamente")
+            }
+        }.onFailure { e ->
+            Result.failure<String>(Exception("Error de autenticación: ${e.message}", e))
         }
     }
 

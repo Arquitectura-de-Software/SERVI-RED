@@ -7,9 +7,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.lifecycleScope
+import com.servired.app.core.data.remote.SupabaseClient
 import com.servired.app.core.network.ConnectivityObserver
 import com.servired.app.navigation.NavGraph
 import com.servired.app.ui.theme.ServiRedAppTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -28,6 +31,13 @@ class MainActivity : ComponentActivity() {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+
+        // Inicia sesión ciudadana anónima para permitir la creación de reportes bajo RLS
+        lifecycleScope.launch {
+            if (connectivityObserver.isCurrentlyConnected() && SupabaseClient.getAccessToken() == null) {
+                SupabaseClient.iniciarSesionAnonima()
+            }
         }
 
         setContent {

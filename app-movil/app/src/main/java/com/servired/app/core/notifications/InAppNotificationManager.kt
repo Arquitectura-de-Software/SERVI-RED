@@ -1,5 +1,6 @@
 package com.servired.app.core.notifications
 
+import com.servired.app.core.data.remote.SupabaseClient
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.android.Android
 import io.ktor.client.plugins.websocket.WebSockets
@@ -19,8 +20,8 @@ import kotlinx.serialization.json.jsonPrimitive
 
 // Escucha cambios en la tabla `reporte` vía Supabase Realtime (WebSocket)
 class InAppNotificationManager(
-    private val supabaseUrl: String,
-    private val supabaseAnonKey: String
+    private val supabaseUrl: String = SupabaseClient.SUPABASE_URL,
+    private val supabaseAnonKey: String = SupabaseClient.SUPABASE_ANON_KEY
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

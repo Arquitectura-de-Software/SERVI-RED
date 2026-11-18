@@ -27,6 +27,11 @@ class OutboxSyncWorker(
     override suspend fun doWork(): Result {
         var todosExitosos = true
 
+        // Asegura sesión anónima antes de sincronizar si aún no existe en memoria
+        if (SupabaseClient.getAccessToken() == null) {
+            SupabaseClient.iniciarSesionAnonima()
+        }
+
         val reportesPendientes = reporteDao.getPendientes()
         for (reporte in reportesPendientes) {
             if (reporte.intentosSincronizacion >= 5) continue
