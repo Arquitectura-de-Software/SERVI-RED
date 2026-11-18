@@ -1,6 +1,9 @@
 package com.servired.app.navigation
 
+import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -17,7 +20,6 @@ import com.servired.app.feature.reporte.ReporteScreen
 import com.servired.app.feature.reporte.ReporteViewModel
 import com.servired.app.feature.seguimiento.SeguimientoScreen
 import com.servired.app.feature.seguimiento.SeguimientoViewModel
-import android.content.Context
 
 object Routes {
     const val HOME = "home"
@@ -30,10 +32,11 @@ object Routes {
 @Composable
 fun NavGraph(context: Context, connectivityObserver: ConnectivityObserver) {
     val navController = rememberNavController()
-    val db = AppDatabase.getInstance(context)
 
-    val reporteRepo = ReporteRepositoryImpl(context, db, connectivityObserver)
-    val denunciaRepo = DenunciaRepositoryImpl(context, db, connectivityObserver)
+    val db = remember { AppDatabase.getInstance(context) }
+    val reporteRepo = remember { ReporteRepositoryImpl(context, db, connectivityObserver) }
+    val denunciaRepo = remember { DenunciaRepositoryImpl(context, db, connectivityObserver) }
+    val viewModelFactory = remember { AppViewModelFactory(reporteRepo, denunciaRepo, connectivityObserver) }
 
     NavHost(navController = navController, startDestination = Routes.HOME) {
         composable(Routes.HOME) {
@@ -46,7 +49,8 @@ fun NavGraph(context: Context, connectivityObserver: ConnectivityObserver) {
         }
 
         composable(Routes.REPORTE_NUEVO) {
-            val viewModel = ReporteViewModel(reporteRepo, connectivityObserver)
+            // El ViewModel se conserva a través de recomposiciones y cambios de configuración
+            val viewModel: ReporteViewModel = viewModel(factory = viewModelFactory)
             ReporteScreen(viewModel = viewModel)
         }
 
@@ -61,12 +65,12 @@ fun NavGraph(context: Context, connectivityObserver: ConnectivityObserver) {
             )
         ) { backStack ->
             val reporteId = backStack.arguments?.getString("reporteId")
-            val viewModel = SeguimientoViewModel(reporteRepo, denunciaRepo, connectivityObserver)
+            val viewModel: SeguimientoViewModel = viewModel(factory = viewModelFactory)
             SeguimientoScreen(viewModel = viewModel, reporteIdInicial = reporteId)
         }
 
         composable(Routes.DENUNCIA_NUEVA) {
-            val viewModel = DenunciaViewModel(denunciaRepo, connectivityObserver)
+            val viewModel: DenunciaViewModel = viewModel(factory = viewModelFactory)
             DenunciaScreen(viewModel = viewModel)
         }
     }
