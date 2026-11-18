@@ -28,9 +28,7 @@ class OutboxSyncWorker(
         var todosExitosos = true
 
         // Asegura sesión anónima antes de sincronizar si aún no existe en memoria
-        if (SupabaseClient.getAccessToken() == null) {
-            SupabaseClient.iniciarSesionAnonima()
-        }
+        SupabaseClient.asegurarSesion(context)
 
         val reportesPendientes = reporteDao.getPendientes()
         for (reporte in reportesPendientes) {

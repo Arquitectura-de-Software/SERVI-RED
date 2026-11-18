@@ -55,6 +55,7 @@ class ReporteRepositoryImpl(
         dao.insertOrIgnore(entity)
 
         if (connectivityObserver.isCurrentlyConnected()) {
+            SupabaseClient.asegurarSesion(context)
             val dto = ReporteDto(
                 clientRequestId = clientRequestId,
                 servicioId = entity.servicioId,
@@ -90,6 +91,7 @@ class ReporteRepositoryImpl(
             else Result.failure(Exception("Sin conexión y sin datos locales"))
         }
 
+        SupabaseClient.asegurarSesion(context)
         return SupabaseClient.consultarReporte(id).map { dto ->
             Reporte(
                 id = id,

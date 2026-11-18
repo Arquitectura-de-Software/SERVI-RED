@@ -1,6 +1,8 @@
 package com.servired.app.core.data.remote
 
+import android.content.Context
 import com.servired.app.BuildConfig
+import com.servired.app.core.data.local.SessionManager
 import com.servired.app.core.data.remote.dto.DenunciaDto
 import com.servired.app.core.data.remote.dto.DenunciaResponseDto
 import com.servired.app.core.data.remote.dto.ReporteDto
@@ -65,6 +67,7 @@ object SupabaseClient {
     @Serializable
     data class AuthResponse(
         @SerialName("access_token") val accessToken: String,
+        @SerialName("refresh_token") val refreshToken: String? = null,
         @SerialName("token_type") val tokenType: String? = null,
         val user: AuthUser? = null
     )
@@ -74,21 +77,49 @@ object SupabaseClient {
         val id: String
     )
 
-    suspend fun iniciarSesionAnonima(): Result<String> {
+    /**
+     * Asegura que exista una sesión ciudadana activa.
+     * Si ya existe un token en SharedPreferences, lo reutiliza y evita crear usuarios duplicados.
+     * Si no existe, realiza el registro de sesión anónima en Supabase Auth.
+     */
+    suspend fun asegurarSesion(context: Context): Result<String> {
+        val sessionManager = SessionManager.getInstance(context)
+        val tokenGuardado = sessionManager.obtenerAccessToken()
+        val userIdGuardado = sessionManager.obtenerUserId()
+
+        if (!tokenGuardado.isNullOrBlank()) {
+            setSession(tokenGuardado, userIdGuardado)
+            return Result.success(tokenGuardado)
+        }
+
+        return iniciarSesionAnonima(context)
+    }
+
+    suspend fun iniciarSesionAnonima(context: Context? = null): Result<String> {
         return runCatching {
             val response = httpClient.post("$SUPABASE_URL/auth/v1/signup") {
                 contentType(ContentType.Application.Json)
+                // Para el signup inicial usamos la clave anónima pública
+                header("apikey", SUPABASE_ANON_KEY)
+                header("Authorization", "Bearer $SUPABASE_ANON_KEY")
                 setBody("{}")
             }
             if (response.status == HttpStatusCode.OK || response.status == HttpStatusCode.Created) {
                 val authData = response.body<AuthResponse>()
                 setSession(authData.accessToken, authData.user?.id)
+                if (context != null) {
+                    SessionManager.getInstance(context).guardarSesion(
+                        accessToken = authData.accessToken,
+                        refreshToken = authData.refreshToken,
+                        userId = authData.user?.id
+                    )
+                }
                 authData.accessToken
             } else {
                 throw Exception("Error HTTP ${response.status.value} al autenticar anónimamente")
             }
         }.onFailure { e ->
-            Result.failure<String>(Exception("Error de autenticación: ${e.message}", e))
+            Result.failure<String>(Exception("Error de autenticación anónima: ${e.message}", e))
         }
     }
 

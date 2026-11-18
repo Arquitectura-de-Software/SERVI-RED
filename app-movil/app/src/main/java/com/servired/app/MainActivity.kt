@@ -33,10 +33,10 @@ class MainActivity : ComponentActivity() {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
 
-        // Inicia sesión ciudadana anónima para permitir la creación de reportes bajo RLS
+        // Asegura sesión ciudadana anónima (persistida) para permitir la creación de reportes bajo RLS
         lifecycleScope.launch {
-            if (connectivityObserver.isCurrentlyConnected() && SupabaseClient.getAccessToken() == null) {
-                SupabaseClient.iniciarSesionAnonima()
+            if (connectivityObserver.isCurrentlyConnected()) {
+                SupabaseClient.asegurarSesion(applicationContext)
             }
         }
 
