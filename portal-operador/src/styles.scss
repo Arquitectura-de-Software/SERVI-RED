@@ -1,0 +1,81 @@
+:root {
+  --primario: #1f4e8c;
+  --primario-oscuro: #163a69;
+  --texto: #1d2733;
+  --texto-suave: #5b6878;
+  --fondo: #f4f6f9;
+  --fondo-alt: #e9eef5;
+  --tarjeta: #ffffff;
+  --borde: #d6dde6;
+  --peligro: #b42318;
+  --ok: #1e7a3c;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 15px;
+  color: var(--texto);
+  background: var(--fondo);
+}
+
+a { color: var(--primario); }
+
+.tarjeta {
+  background: var(--tarjeta);
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+input, select, textarea, button { font: inherit; }
+
+input, select, textarea {
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  padding: .4rem .55rem;
+  background: #fff;
+  min-width: 0;
+}
+
+button {
+  border: 1px solid var(--primario);
+  background: var(--primario);
+  color: #fff;
+  border-radius: 6px;
+  padding: .45rem .9rem;
+  cursor: pointer;
+}
+button:hover:not(:disabled) { background: var(--primario-oscuro); }
+button:disabled { opacity: .55; cursor: not-allowed; }
+button.secundario { background: #fff; color: var(--primario); }
+button.peligro { background: var(--peligro); border-color: var(--peligro); }
+button.enlace { background: none; border: 0; color: var(--primario); padding: 0; text-decoration: underline; }
+
+.error {
+  background: #fdecea; color: var(--peligro); border: 1px solid #f5c2bd;
+  border-radius: 8px; padding: .6rem .8rem; margin: .5rem 0;
+}
+.ok {
+  background: #e7f5ec; color: var(--ok); border: 1px solid #b7e1c4;
+  border-radius: 8px; padding: .6rem .8rem; margin: .5rem 0;
+}
+.aviso {
+  background: #fff6e0; color: #7a5200; border: 1px solid #f1d58e;
+  border-radius: 8px; padding: .6rem .8rem; margin: .5rem 0;
+}
+
+table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+th, td { text-align: left; padding: .35rem .45rem; border-bottom: 1px solid var(--borde); }
+th { font-weight: 600; color: var(--texto-suave); position: sticky; top: 0; background: var(--tarjeta); }
+
+.prioridad {
+  display: inline-grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%;
+  font-weight: 700; font-size: .8rem; background: #e3e8ef;
+}
+.prioridad.p1 { background: #b42318; color: #fff; }
+.prioridad.p2 { background: #e0661b; color: #fff; }
+.prioridad.p3 { background: #f2c94c; }
