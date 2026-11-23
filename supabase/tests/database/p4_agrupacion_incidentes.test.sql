@@ -1,4 +1,6 @@
 -- SERVI-RED | Persona 4 | Pruebas de la agrupación automática de reportes
+-- La agrupación es asíncrona (ADR-03): se inserta el reporte y luego se ejecuta
+-- private.agrupar_pendientes(), lo mismo que hace pg_cron cada 30 s.
 begin;
 create extension if not exists pgtap with schema extensions;
 select * from no_plan();
@@ -15,12 +17,18 @@ create function public.p4t_serv(p text) returns smallint language sql as $$
 -- Punto a `p_norte_m` metros al norte de una base en Bogotá.
 create function public.p4t_punto(p_norte_m double precision) returns extensions.geography language sql as $$
   select extensions.st_setsrid(extensions.st_makepoint(-74.07, 4.65 + p_norte_m / 111320.0), 4326)::extensions.geography $$;
-create function public.p4t_reporte(p_id uuid, p_servicio text, p_municipio text, p_norte_m double precision,
-                                   p_creado timestamptz default now()) returns uuid language sql as $$
+create function public.p4t_insertar(p_id uuid, p_servicio text, p_municipio text, p_norte_m double precision,
+                                    p_creado timestamptz default now()) returns void language sql as $$
   insert into public.reporte (id, client_request_id, ciudadano_id, servicio_id, municipio_codigo, ubicacion, creado_en)
   values (p_id, gen_random_uuid(), 'c4444444-4444-4444-4444-444444444444', public.p4t_serv(p_servicio),
-          p_municipio, public.p4t_punto(p_norte_m), p_creado)
-  returning (select incidente_id from public.reporte where id = p_id) $$;
+          p_municipio, public.p4t_punto(p_norte_m), p_creado) $$;
+-- Inserta y ejecuta el proceso de agrupación (como lo haría pg_cron).
+create function public.p4t_reporte(p_id uuid, p_servicio text, p_municipio text, p_norte_m double precision,
+                                   p_creado timestamptz default now()) returns integer language plpgsql as $$
+begin
+  perform public.p4t_insertar(p_id, p_servicio, p_municipio, p_norte_m, p_creado);
+  return private.agrupar_pendientes();
+end $$;
 create function public.p4t_inc(p_reporte uuid) returns uuid language sql as $$
   select incidente_id from public.reporte where id = p_reporte $$;
 
@@ -45,8 +53,19 @@ insert into empresa_cobertura (empresa_id, servicio_id, municipio_codigo) values
 select is((select count(*)::int from config_agrupacion), 5, 'hay configuración para los 5 tipos de servicio');
 select is((select radio_m from config_agrupacion where servicio_tipo = 'energia'), 1000, 'energía agrupa a 1000 m');
 
+-- ---------- 0. asincronía (ADR-03) ----------
+select ok(not exists (select 1 from pg_trigger where tgname = 'p4_agrupar_reporte'),
+  'ya no hay trigger de agrupación síncrona en reporte');
+select is(private.agrupar_pendientes(), 0, 'sin reportes pendientes el proceso no hace nada');
+
 -- ---------- 1. primer reporte: crea incidente ----------
-select public.p4t_reporte('14000000-0000-0000-0000-000000000001', 'energia', '11001', 0);
+select public.p4t_insertar('14000000-0000-0000-0000-000000000001', 'energia', '11001', 0);
+select is(public.p4t_inc('14000000-0000-0000-0000-000000000001'), null,
+  'justo después del INSERT el reporte sigue sin incidente (confirmación inmediata)');
+select is((select estado::text from reporte where id = '14000000-0000-0000-0000-000000000001'), 'recibido',
+  'y sigue en recibido hasta que corre el proceso');
+select is(private.agrupar_pendientes(), 1, 'el proceso vincula el reporte pendiente');
+select is(private.agrupar_pendientes(), 0, 'una segunda ejecución no hace nada (idempotente)');
 select isnt(public.p4t_inc('14000000-0000-0000-0000-000000000001'), null, 'el primer reporte crea un incidente');
 select is((select estado::text from reporte where id = '14000000-0000-0000-0000-000000000001'), 'vinculado',
   'el reporte agrupado queda en estado vinculado');
@@ -106,6 +125,22 @@ values ('14000000-0000-0000-0000-000000000011', gen_random_uuid(), 'c4444444-444
 select is(public.p4t_inc('14000000-0000-0000-0000-000000000011'), public.p4t_inc('14000000-0000-0000-0000-000000000003'),
   'un reporte que ya trae incidente conserva el suyo');
 
+-- Un reporte descartado (p. ej. por moderación) no se agrupa.
+insert into reporte (id, client_request_id, ciudadano_id, servicio_id, municipio_codigo, ubicacion, estado)
+values ('14000000-0000-0000-0000-000000000012', gen_random_uuid(), 'c4444444-4444-4444-4444-444444444444',
+        public.p4t_serv('energia'), '11001', public.p4t_punto(0), 'descartado');
+select is(private.agrupar_pendientes(), 0, 'un reporte descartado no se procesa');
+select is(public.p4t_inc('14000000-0000-0000-0000-000000000012'), null, 'el reporte descartado queda sin incidente');
+
+-- El límite por ejecución se respeta y el resto queda para la siguiente.
+select public.p4t_insertar('14000000-0000-0000-0000-000000000013', 'gas', '11001', 0);
+select public.p4t_insertar('14000000-0000-0000-0000-000000000014', 'gas', '11001', 50);
+select is(private.agrupar_pendientes(1), 1, 'con límite 1 procesa un solo reporte');
+select is(public.p4t_inc('14000000-0000-0000-0000-000000000014'), null, 'el segundo espera a la siguiente ejecución');
+select is(private.agrupar_pendientes(), 1, 'la siguiente ejecución lo procesa');
+select is(public.p4t_inc('14000000-0000-0000-0000-000000000014'), public.p4t_inc('14000000-0000-0000-0000-000000000013'),
+  'y lo agrupa con el anterior');
+
 -- ---------- 8. trazabilidad: outbox y auditoría ----------
 select ok(exists (select 1 from evento_outbox
   where tipo = 'reporte.estado_cambiado'
@@ -121,9 +156,14 @@ select public.p4t_como('c4444444-4444-4444-4444-444444444444');
 -- En otra sentencia: la misma sentencia no vería la fila que inserta la función.
 select set_config('p4t.rid', (select reporte_id::text from public.registrar_reporte(
   gen_random_uuid(), public.p4t_serv('energia'), '11001', 4.65 + 300 / 111320.0, -74.07)), true);
+select is((select incidente_id from reporte where id = current_setting('p4t.rid')::uuid), null,
+  'registrar_reporte confirma al ciudadano sin esperar la agrupación');
+reset role;
+select is(private.agrupar_pendientes(), 1, 'el proceso toma el reporte del ciudadano');
 select is((select incidente_id from reporte where id = current_setting('p4t.rid')::uuid),
   public.p4t_inc('14000000-0000-0000-0000-000000000001'),
-  'un reporte del ciudadano por registrar_reporte se agrupa automáticamente');
+  'un reporte del ciudadano por registrar_reporte se agrupa en el incidente cercano');
+select public.p4t_como('c4444444-4444-4444-4444-444444444444');
 
 -- ---------- 10. incidentes_cercanos ----------
 select is((select incidente_id from public.incidentes_cercanos(public.p4t_serv('energia'), 4.65 + 250 / 111320.0, -74.07) limit 1),
@@ -133,8 +173,14 @@ select is((select count(*)::int from public.incidentes_cercanos(public.p4t_serv(
 select is((select count(*)::int from public.incidentes_cercanos(public.p4t_serv('energia'), 99, -74.07)), 0,
   'incidentes_cercanos ignora coordenadas fuera de rango');
 
--- ---------- 11. permisos ----------
-select throws_ok($$select private.agrupar_reporte()$$, '42501', null, 'un cliente no puede ejecutar la función interna');
+-- ---------- 11. permisos y programación ----------
+reset role;
+select ok(exists (select 1 from cron.job where jobname = 'p4-agrupar-reportes' and schedule = '30 seconds'
+                  and command = 'select private.agrupar_pendientes()'),
+  'pg_cron ejecuta la agrupación cada 30 s');
+select public.p4t_como('c4444444-4444-4444-4444-444444444444');
+select throws_ok($$select private.agrupar_pendientes()$$, '42501', null, 'un cliente no puede ejecutar el proceso de agrupación');
+select throws_ok($$select private.agrupar_reporte_uno(gen_random_uuid())$$, '42501', null, 'ni agrupar un reporte a mano');
 update config_agrupacion set radio_m = 50 where servicio_tipo = 'energia';
 reset role;
 select is((select radio_m from config_agrupacion where servicio_tipo = 'energia'), 1000, 'un ciudadano no cambia la configuración');

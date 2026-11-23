@@ -38,6 +38,8 @@ insert into reporte (id, client_request_id, ciudadano_id, servicio_id, municipio
   ('15000000-0000-0000-0000-000000000001', gen_random_uuid(), 'c5555555-0000-0000-0000-000000000001', public.p4g_serv('energia'), '11001', public.p4g_punto(0)),
   ('15000000-0000-0000-0000-000000000002', gen_random_uuid(), 'c5555555-0000-0000-0000-000000000001', public.p4g_serv('energia'), '11001', public.p4g_punto(100)),
   ('15000000-0000-0000-0000-000000000003', gen_random_uuid(), 'c5555555-0000-0000-0000-000000000001', public.p4g_serv('alcantarillado'), '11001', public.p4g_punto(0));
+-- Agrupación asíncrona (ADR-03): se ejecuta el proceso que corre pg_cron.
+select private.agrupar_pendientes();
 select set_config('p4g.ie', public.p4g_inc('15000000-0000-0000-0000-000000000001')::text, true);
 select set_config('p4g.ia', public.p4g_inc('15000000-0000-0000-0000-000000000003')::text, true);
 create function public.p4g_ie() returns uuid language sql as $$ select current_setting('p4g.ie')::uuid $$;
@@ -150,8 +152,10 @@ select is((select servicio_tipo::text || '|' || municipio || '|' || empresa from
   'energia|Bogotá, D.C.|Operador Demo Energía', 'la vista trae servicio, municipio y empresa');
 
 select public.p4g_como('b5555555-0000-0000-0000-000000000001');
-select is((select total_reportes from incidente_operacion where id = public.p4g_ie()), 0,
-  'un operador de otra empresa no ve los reportes del incidente');
+select is((select count(*)::int from incidente_operacion where id = public.p4g_ie()), 0,
+  'un operador de otra empresa no ve el incidente en la vista del portal');
+select is((select count(*)::int from reporte where incidente_id = public.p4g_ie()), 0,
+  'ni sus reportes');
 
 reset role;
 set local role anon;
