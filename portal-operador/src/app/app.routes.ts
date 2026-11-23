@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { rolGuard } from './core/rol.guard';
 
 export const routes: Routes = [
+  { path: 'datos-abiertos', loadComponent: () => import('./features/publico/publico').then(m => m.Publico) },
   { path: 'login', loadComponent: () => import('./features/login/login').then((m) => m.Login) },
   {
     path: '',
