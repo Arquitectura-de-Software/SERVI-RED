@@ -8,7 +8,7 @@ lifecycleRuntimeKtx = "2.6.1"
 activityCompose = "1.8.0"
 kotlin = "2.2.10"
 composeBom = "2026.02.01"
-ksp = "2.2.10-2.0.1"
+ksp = "2.3.14"
 googleServices = "4.4.3"
 
 [libraries]
