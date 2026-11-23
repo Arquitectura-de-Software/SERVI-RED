@@ -17,7 +17,9 @@ import { SupabaseService } from '../../core/supabase.service';
     @if (problema()) {
       <p class="aviso" role="status" data-testid="respaldo">
         {{ problema() }}
-        <a [href]="supersetUrl" target="_blank" rel="noopener">Abrir Superset en otra pestaña</a>.
+        @if (supersetUrl) {
+          <a [href]="supersetUrl" target="_blank" rel="noopener">Abrir Superset en otra pestaña</a>.
+        }
       </p>
     }
     <div #tablero class="tablero" [hidden]="!!problema()"></div>

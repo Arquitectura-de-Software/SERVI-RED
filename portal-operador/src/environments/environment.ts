@@ -1,13 +1,11 @@
-// Configuración LOCAL (Supabase CLI). La anon key de abajo es la clave de demostración
-// que trae el Supabase CLI: es la misma en todas las instalaciones locales y es pública
-// por diseño (la seguridad la da la RLS). Nunca poner aquí la service_role ni claves de la nube.
-// Valores: `npx supabase status`.
+// Configuración pública del cliente web. La URL y la clave publicable se incluyen
+// en el bundle; la seguridad depende de RLS. Nunca poner aquí la service_role.
 export const environment = {
   production: false,
   supabaseUrl: 'https://dfjbmgzadgvdfswenuef.supabase.co',
   supabaseAnonKey:
     'sb_publishable_HwuRceE67mCr1AubpP4gGQ_QpJ93CXy',
-  // Tablero de Superset embebido (Paso 8). Vacío = se muestra el enlace de respaldo.
-  supersetUrl: 'http://localhost:8088',
+  // Configurar cuando Superset tenga una URL accesible desde el portal.
+  supersetUrl: '',
   supersetDashboardId: '',
 };

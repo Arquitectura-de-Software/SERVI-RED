@@ -5,20 +5,25 @@ migraciones `p4_*`; toda la seguridad está en la base (RLS y funciones), el por
 
 ## Requisitos
 - Node 24 (Angular 21; Angular 22 exige Node ≥ 24.15).
-- Supabase local corriendo (`npx supabase start`) y los usuarios de prueba de `supabase/seed_p4_demo.sql`.
+- Proyecto Supabase accesible y configurado en `src/environments/environment.ts`.
+- Para entrar al portal se necesitan usuarios con perfiles y roles de operador/regulador/admin creados en Supabase.
 
 ## Comandos
 ```bash
-npm install
+npm ci
 npm start            # http://localhost:4200
 npm test             # pruebas unitarias (Vitest)
 npx playwright install chromium   # una vez
 npm run e2e          # pruebas e2e contra el Supabase local
 ```
 
+Las pruebas E2E esperan usuarios de `supabase/seed_p4_demo.sql`; ese archivo no está incluido actualmente.
+
 ## Configuración
-`src/environments/environment.ts` solo tiene la URL local y la anon key de demostración del Supabase CLI
-(pública, igual en todas las instalaciones). Nunca poner aquí la `service_role` ni claves de la nube.
+`src/environments/environment.ts` contiene la URL y la clave publicable del proyecto Supabase. La clave
+publicable puede estar en el frontend; nunca agregues `service_role` ni otras credenciales privadas.
+`supersetUrl` y `supersetDashboardId` deben permanecer vacíos hasta que Superset esté publicado y
+configurado. Así el portal no ofrece un enlace local que no funcionaría para sus usuarios.
 
 ## Pantallas
 | Ruta | Roles | Qué hace |
@@ -34,3 +39,20 @@ npm run e2e          # pruebas e2e contra el Supabase local
   si falla la red (la base es idempotente).
 - Tiempo real: canal privado `empresa:<id>` (operador) o `admin` (Broadcast). Si el canal falla, la pantalla
   se refresca cada 30 s.
+
+## Despliegue estático en Cloudflare Pages
+
+El portal público (`/datos-abiertos`) y el portal del operador son rutas de esta misma aplicación Angular:
+se despliega una sola vez desde `portal-operador/`.
+
+1. En Cloudflare, crea un proyecto de Pages e importa el repositorio GitHub.
+2. Establece el directorio raíz en `portal-operador`.
+3. Usa `npm run build` como comando de build y `dist/portal-operador/browser` como directorio de salida.
+4. Define `NODE_VERSION=24` en las variables de entorno de build.
+5. Despliega y comprueba directamente tanto `/datos-abiertos` como `/login` en el dominio `pages.dev`.
+6. Configura el dominio final en Supabase Auth como URL del sitio y en las URL de redirección permitidas.
+
+La aplicación consume Supabase directamente desde el navegador; nunca agregues `service_role` como variable
+de Pages ni al código del portal. Cloudflare Pages aloja el frontend, no Apache Superset. Para habilitar los
+indicadores embebidos se requiere publicar Superset por separado y configurar `supersetUrl` y
+`supersetDashboardId`.
