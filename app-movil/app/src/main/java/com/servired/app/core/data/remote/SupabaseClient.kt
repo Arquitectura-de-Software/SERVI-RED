@@ -125,6 +125,29 @@ object SupabaseClient {
         }
     }
 
+    suspend fun subirEvidenciaReporte(byteArray: ByteArray, mimeType: String = "image/jpeg"): Result<String> {
+        return runCatching {
+            val userId = getCurrentUserId() ?: throw Exception("Se requiere sesión ciudadana activa para subir evidencias")
+            val fileName = "${java.util.UUID.randomUUID()}.jpg"
+            val path = "$userId/$fileName"
+
+            val response = httpClient.post("$SUPABASE_URL/storage/v1/object/evidencias-reportes/$path") {
+                contentType(ContentType.parse(mimeType))
+                header("apikey", SUPABASE_ANON_KEY)
+                header("Authorization", getAuthHeader())
+                setBody(byteArray)
+            }
+
+            if (response.status == HttpStatusCode.OK || response.status == HttpStatusCode.Created) {
+                path
+            } else {
+                throw Exception("Error HTTP ${response.status.value} al subir imagen a Storage: ${response.body<String>()}")
+            }
+        }.onFailure { e ->
+            Result.failure<String>(Exception("Error al subir evidencia: ${e.message}", e))
+        }
+    }
+
     suspend fun registrarReporte(dto: ReporteDto): Result<ReporteResponseDto> {
         return runCatching {
             val response = httpClient.post("$SUPABASE_URL/rest/v1/rpc/registrar_reporte") {

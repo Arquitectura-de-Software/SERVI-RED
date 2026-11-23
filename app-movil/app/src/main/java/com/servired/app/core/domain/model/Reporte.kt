@@ -11,5 +11,7 @@ data class Reporte(
     val estado: String,
     val pendienteSync: Boolean,
     val creadoEn: Long,
-    val intentosSincronizacion: Int
+    val intentosSincronizacion: Int,
+    val urlEvidencia: String? = null,
+    val inicioEstimado: String? = null
 )

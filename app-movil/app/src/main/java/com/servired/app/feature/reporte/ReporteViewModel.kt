@@ -2,6 +2,7 @@ package com.servired.app.feature.reporte
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.servired.app.core.data.remote.SupabaseClient
 import com.servired.app.core.domain.model.Reporte
 import com.servired.app.core.domain.model.TipoServicio
 import com.servired.app.core.domain.repository.ReporteRepository
@@ -59,11 +60,21 @@ class ReporteViewModel(
         municipio: String,
         lat: Double,
         lng: Double,
-        descripcion: String?
+        descripcion: String?,
+        urlEvidencia: String? = null,
+        inicioEstimado: String? = null
     ) {
         viewModelScope.launch {
             _uiState.value = ReporteUiState.Loading
-            val resultado = repository.crearReporte(servicio, municipio, lat, lng, descripcion)
+            val resultado = repository.crearReporte(
+                servicio = servicio,
+                municipio = municipio,
+                lat = lat,
+                lng = lng,
+                descripcion = descripcion,
+                urlEvidencia = urlEvidencia,
+                inicioEstimado = inicioEstimado
+            )
             if (resultado.isSuccess) {
                 _reporteIdCreado.value = resultado.getOrNull()
                 cargarReportes()
@@ -72,6 +83,13 @@ class ReporteViewModel(
                     resultado.exceptionOrNull()?.message ?: "Error desconocido"
                 )
             }
+        }
+    }
+
+    fun subirEvidencia(byteArray: ByteArray, onResultado: (Result<String>) -> Unit) {
+        viewModelScope.launch {
+            val resultado = SupabaseClient.subirEvidenciaReporte(byteArray)
+            onResultado(resultado)
         }
     }
 

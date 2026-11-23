@@ -34,7 +34,9 @@ class ReporteRepositoryImpl(
         municipio: String,
         lat: Double,
         lng: Double,
-        descripcion: String?
+        descripcion: String?,
+        urlEvidencia: String?,
+        inicioEstimado: String?
     ): Result<String> {
         val id = UUID.randomUUID().toString()
         val clientRequestId = UUID.randomUUID().toString()
@@ -48,7 +50,9 @@ class ReporteRepositoryImpl(
             lng = lng,
             descripcion = descripcion,
             estado = "recibido",
-            pendienteSync = true
+            pendienteSync = true,
+            urlEvidencia = urlEvidencia,
+            inicioEstimado = inicioEstimado
         )
 
         // Offline-first: siempre persiste localmente primero
@@ -62,7 +66,9 @@ class ReporteRepositoryImpl(
                 municipioCodigo = municipio,
                 lat = lat,
                 lng = lng,
-                descripcion = descripcion
+                descripcion = descripcion,
+                urlEvidencia = urlEvidencia,
+                inicioEstimado = inicioEstimado
             )
             val resultado = SupabaseClient.registrarReporte(dto)
             if (resultado.isSuccess) {
@@ -127,6 +133,8 @@ class ReporteRepositoryImpl(
         estado = estado,
         pendienteSync = pendienteSync,
         creadoEn = creadoEn,
-        intentosSincronizacion = intentosSincronizacion
+        intentosSincronizacion = intentosSincronizacion,
+        urlEvidencia = urlEvidencia,
+        inicioEstimado = inicioEstimado
     )
 }

@@ -40,7 +40,9 @@ class OutboxSyncWorker(
                 municipioCodigo = reporte.municipioCodigo,
                 lat = reporte.lat,
                 lng = reporte.lng,
-                descripcion = reporte.descripcion
+                descripcion = reporte.descripcion,
+                urlEvidencia = reporte.urlEvidencia,
+                inicioEstimado = reporte.inicioEstimado
             )
 
             val resultado = SupabaseClient.registrarReporte(dto)

@@ -11,7 +11,9 @@ interface ReporteRepository {
         municipio: String,
         lat: Double,
         lng: Double,
-        descripcion: String?
+        descripcion: String?,
+        urlEvidencia: String? = null,
+        inicioEstimado: String? = null
     ): Result<String>
     suspend fun consultarPorId(id: String): Result<Reporte>
 }

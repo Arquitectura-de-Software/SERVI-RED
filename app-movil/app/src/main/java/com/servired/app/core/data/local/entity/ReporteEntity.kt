@@ -19,5 +19,7 @@ data class ReporteEntity(
     val estado: String,
     val pendienteSync: Boolean = true,
     val creadoEn: Long = System.currentTimeMillis(),
-    val intentosSincronizacion: Int = 0
+    val intentosSincronizacion: Int = 0,
+    val urlEvidencia: String? = null,
+    val inicioEstimado: String? = null
 )

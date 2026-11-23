@@ -10,7 +10,7 @@ import com.servired.app.core.data.local.entity.ReporteEntity
 // Room requiere: implementation("androidx.room:room-runtime:2.6.1") y ksp("androidx.room:room-compiler:2.6.1")
 @Database(
     entities = [ReporteEntity::class, DenunciaEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -28,7 +28,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "servired.db"
-                ).build().also { INSTANCE = it }
+                )
+                    .fallbackToDestructiveMigration()
+                    .build().also { INSTANCE = it }
             }
         }
     }
