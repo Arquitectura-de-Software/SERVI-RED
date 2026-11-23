@@ -28,6 +28,9 @@ configurado. Así el portal no ofrece un enlace local que no funcionaría para s
 ## Pantallas
 | Ruta | Roles | Qué hace |
 |---|---|---|
+| `/` | público | Portada para elegir entre el portal del operador y la consulta ciudadana de datos abiertos |
+| `/login` | público | Inicio de sesión para operador, regulador y admin |
+| `/datos-abiertos` | público | Indicadores agregados y descarga de CSV/GeoJSON |
 | `/mapa` | operador, admin | Mapa (Leaflet + OSM) y lista de incidentes; filtros por servicio, prioridad, departamento/municipio y estado; orden por prioridad sugerida |
 | `/incidentes/:id` | operador, admin | Cambiar estado, priorizar, asignar, responder (opcionalmente visible a los ciudadanos), línea de tiempo, reportes y evidencias |
 | `/moderacion` | operador | Cola de denuncias y reportes; rechazar exige motivo |

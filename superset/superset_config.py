@@ -16,5 +16,4 @@ SQLLAB_TIMEOUT = 60
 # Bloquea conexiones inseguras (por ejemplo, SQLite) desde la interfaz
 PREVENT_UNSAFE_DB_CONNECTIONS = True
 
-# La Persona 5 activará aquí el embebido de dashboards cuando lo necesite:
-# FEATURE_FLAGS = {"EMBEDDED_SUPERSET": True}
+FEATURE_FLAGS = {"EMBEDDED_SUPERSET": True}
