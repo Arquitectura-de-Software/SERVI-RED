@@ -39,3 +39,23 @@ data class ReporteDetalleDto(
     @SerialName("creado_en") val creadoEn: String? = null,
     @SerialName("incidente_id") val incidenteId: String? = null
 )
+
+@Serializable
+data class ConsultaCercanosDto(
+    @SerialName("p_lat") val lat: Double,
+    @SerialName("p_lng") val lng: Double,
+    @SerialName("p_radio_metros") val radioMetros: Double = 25000.0
+)
+
+@Serializable
+data class IncidenteCercanoDto(
+    val id: String,
+    @SerialName("servicio_id") val servicioId: Int = 1,
+    @SerialName("municipio_codigo") val municipioCodigo: String? = null,
+    val lat: Double,
+    val lng: Double,
+    val estado: String = "recibido",
+    val prioridad: Int = 3,
+    @SerialName("creado_en") val creadoEn: String? = null,
+    @SerialName("distancia_metros") val distanciaMetros: Double? = null
+)

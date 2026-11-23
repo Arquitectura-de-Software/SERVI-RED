@@ -3,9 +3,11 @@ package com.servired.app.core.data.remote
 import android.content.Context
 import com.servired.app.BuildConfig
 import com.servired.app.core.data.local.SessionManager
+import com.servired.app.core.data.remote.dto.ConsultaCercanosDto
 import com.servired.app.core.data.remote.dto.ConsultaDenunciaDto
 import com.servired.app.core.data.remote.dto.ConsultaDenunciaResponseDto
 import com.servired.app.core.data.remote.dto.DenunciaDto
+import com.servired.app.core.data.remote.dto.IncidenteCercanoDto
 import com.servired.app.core.data.remote.dto.ReporteDetalleDto
 import com.servired.app.core.data.remote.dto.ReporteDto
 import com.servired.app.core.data.remote.dto.ReporteResponseDto
@@ -219,6 +221,29 @@ object SupabaseClient {
             }
         }.onFailure { e ->
             Result.failure<ConsultaDenunciaResponseDto>(Exception("Error de red: ${e.message}", e))
+        }
+    }
+
+    // Consulta incidentes cercanos por geolocalización (ST_DWithin)
+    suspend fun consultarIncidentesCercanos(
+        lat: Double,
+        lng: Double,
+        radioMetros: Double = 25000.0
+    ): Result<List<IncidenteCercanoDto>> {
+        return runCatching {
+            val response = httpClient.post("$SUPABASE_URL/rest/v1/rpc/consultar_incidentes_cercanos") {
+                contentType(ContentType.Application.Json)
+                setBody(ConsultaCercanosDto(lat = lat, lng = lng, radioMetros = radioMetros))
+            }
+            if (response.status == HttpStatusCode.OK) {
+                response.body<List<IncidenteCercanoDto>>()
+            } else {
+                // Si la función aún no existe en el backend o no hay incidentes, devolver lista vacía sin error bloqueante
+                emptyList()
+            }
+        }.onFailure {
+            // Manejo tolerante a fallos de red
+            Result.success(emptyList<IncidenteCercanoDto>())
         }
     }
 }

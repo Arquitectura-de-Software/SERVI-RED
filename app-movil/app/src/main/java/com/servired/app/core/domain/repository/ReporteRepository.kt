@@ -1,5 +1,6 @@
 package com.servired.app.core.domain.repository
 
+import com.servired.app.core.data.remote.dto.IncidenteCercanoDto
 import com.servired.app.core.domain.model.Reporte
 import com.servired.app.core.domain.model.TipoServicio
 import kotlinx.coroutines.flow.Flow
@@ -16,4 +17,9 @@ interface ReporteRepository {
         inicioEstimado: String? = null
     ): Result<String>
     suspend fun consultarPorId(id: String): Result<Reporte>
+    suspend fun consultarIncidentesCercanos(
+        lat: Double,
+        lng: Double,
+        radioMetros: Double = 25000.0
+    ): List<IncidenteCercanoDto>
 }

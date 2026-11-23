@@ -27,6 +27,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import com.servired.app.core.network.ConnectivityObserver
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -35,7 +39,8 @@ fun HomeScreen(
     connectivityObserver: ConnectivityObserver,
     onNavigarAReporte: () -> Unit,
     onNavigarASeguimiento: () -> Unit,
-    onNavigarADenuncia: () -> Unit
+    onNavigarADenuncia: () -> Unit,
+    onNavigarAMapa: () -> Unit
 ) {
     val isConnected by connectivityObserver.isConnected.collectAsState()
 
@@ -48,6 +53,11 @@ fun HomeScreen(
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
+                },
+                actions = {
+                    IconButton(onClick = onNavigarAMapa) {
+                        Icon(Icons.Default.Place, contentDescription = "Abrir mapa")
+                    }
                 }
             )
         }
@@ -76,6 +86,14 @@ fun HomeScreen(
             )
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            AccionCard(
+                titulo = "Mapa de incidentes",
+                descripcion = "Visualiza interrupciones reportadas y zonas afectadas en tiempo real con OpenStreetMap",
+                onClick = onNavigarAMapa
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             AccionCard(
                 titulo = "Reportar problema",

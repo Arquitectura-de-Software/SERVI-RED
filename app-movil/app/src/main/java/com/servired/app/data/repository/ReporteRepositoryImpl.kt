@@ -3,6 +3,7 @@ package com.servired.app.data.repository
 import com.servired.app.core.data.local.db.AppDatabase
 import com.servired.app.core.data.local.entity.ReporteEntity
 import com.servired.app.core.data.remote.SupabaseClient
+import com.servired.app.core.data.remote.dto.IncidenteCercanoDto
 import com.servired.app.core.data.remote.dto.ReporteDto
 import com.servired.app.core.data.sync.OutboxSyncWorker
 import com.servired.app.core.domain.model.Reporte
@@ -113,6 +114,16 @@ class ReporteRepositoryImpl(
                 intentosSincronizacion = 0
             )
         }
+    }
+
+    override suspend fun consultarIncidentesCercanos(
+        lat: Double,
+        lng: Double,
+        radioMetros: Double
+    ): List<IncidenteCercanoDto> {
+        if (!connectivityObserver.isCurrentlyConnected()) return emptyList()
+        SupabaseClient.asegurarSesion(context)
+        return SupabaseClient.consultarIncidentesCercanos(lat, lng, radioMetros).getOrDefault(emptyList())
     }
 
     private fun parsearFechaIso(fecha: String?): Long {

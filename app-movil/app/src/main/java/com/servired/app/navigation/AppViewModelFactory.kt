@@ -4,15 +4,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.servired.app.core.domain.repository.DenunciaRepository
 import com.servired.app.core.domain.repository.ReporteRepository
+import com.servired.app.core.location.LocationHelper
 import com.servired.app.core.network.ConnectivityObserver
 import com.servired.app.feature.denuncia.DenunciaViewModel
+import com.servired.app.feature.mapa.MapaViewModel
 import com.servired.app.feature.reporte.ReporteViewModel
 import com.servired.app.feature.seguimiento.SeguimientoViewModel
 
 class AppViewModelFactory(
     private val reporteRepo: ReporteRepository,
     private val denunciaRepo: DenunciaRepository,
-    private val connectivityObserver: ConnectivityObserver
+    private val connectivityObserver: ConnectivityObserver,
+    private val locationHelper: LocationHelper
 ) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
@@ -26,6 +29,9 @@ class AppViewModelFactory(
             }
             modelClass.isAssignableFrom(DenunciaViewModel::class.java) -> {
                 DenunciaViewModel(denunciaRepo, connectivityObserver) as T
+            }
+            modelClass.isAssignableFrom(MapaViewModel::class.java) -> {
+                MapaViewModel(reporteRepo, connectivityObserver, locationHelper) as T
             }
             else -> throw IllegalArgumentException("Clase de ViewModel desconocida: ${modelClass.name}")
         }

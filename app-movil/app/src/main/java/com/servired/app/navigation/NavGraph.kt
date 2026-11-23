@@ -12,10 +12,13 @@ import androidx.navigation.navArgument
 import com.servired.app.core.data.local.db.AppDatabase
 import com.servired.app.core.network.ConnectivityObserver
 import com.servired.app.data.repository.DenunciaRepositoryImpl
+import com.servired.app.core.location.LocationHelper
 import com.servired.app.data.repository.ReporteRepositoryImpl
 import com.servired.app.feature.denuncia.DenunciaScreen
 import com.servired.app.feature.denuncia.DenunciaViewModel
 import com.servired.app.feature.home.HomeScreen
+import com.servired.app.feature.mapa.MapaScreen
+import com.servired.app.feature.mapa.MapaViewModel
 import com.servired.app.feature.reporte.ReporteScreen
 import com.servired.app.feature.reporte.ReporteViewModel
 import com.servired.app.feature.seguimiento.SeguimientoScreen
@@ -27,6 +30,7 @@ object Routes {
     const val SEGUIMIENTO = "seguimiento?reporteId={reporteId}"
     const val SEGUIMIENTO_BASE = "seguimiento"
     const val DENUNCIA_NUEVA = "denuncia/nueva"
+    const val MAPA = "mapa"
 }
 
 @Composable
@@ -34,9 +38,10 @@ fun NavGraph(context: Context, connectivityObserver: ConnectivityObserver) {
     val navController = rememberNavController()
 
     val db = remember { AppDatabase.getInstance(context) }
+    val locationHelper = remember { LocationHelper(context) }
     val reporteRepo = remember { ReporteRepositoryImpl(context, db, connectivityObserver) }
     val denunciaRepo = remember { DenunciaRepositoryImpl(context, db, connectivityObserver) }
-    val viewModelFactory = remember { AppViewModelFactory(reporteRepo, denunciaRepo, connectivityObserver) }
+    val viewModelFactory = remember { AppViewModelFactory(reporteRepo, denunciaRepo, connectivityObserver, locationHelper) }
 
     NavHost(navController = navController, startDestination = Routes.HOME) {
         composable(Routes.HOME) {
@@ -44,7 +49,18 @@ fun NavGraph(context: Context, connectivityObserver: ConnectivityObserver) {
                 connectivityObserver = connectivityObserver,
                 onNavigarAReporte = { navController.navigate(Routes.REPORTE_NUEVO) },
                 onNavigarASeguimiento = { navController.navigate(Routes.SEGUIMIENTO_BASE) },
-                onNavigarADenuncia = { navController.navigate(Routes.DENUNCIA_NUEVA) }
+                onNavigarADenuncia = { navController.navigate(Routes.DENUNCIA_NUEVA) },
+                onNavigarAMapa = { navController.navigate(Routes.MAPA) }
+            )
+        }
+
+        composable(Routes.MAPA) {
+            val viewModel: MapaViewModel = viewModel(factory = viewModelFactory)
+            MapaScreen(
+                viewModel = viewModel,
+                onVolver = { navController.popBackStack() },
+                onNavigarASeguimiento = { id -> navController.navigate("seguimiento?reporteId=$id") },
+                onNavigarAReporte = { navController.navigate(Routes.REPORTE_NUEVO) }
             )
         }
 
