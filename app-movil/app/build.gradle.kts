@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -23,7 +25,7 @@ android {
 
         // Carga de credenciales desde secrets.properties o variables de entorno
         val secretsFile = rootProject.file("secrets.properties")
-        val secrets = java.util.Properties()
+        val secrets = Properties()
         if (secretsFile.exists()) {
             secretsFile.inputStream().use { secrets.load(it) }
         }
@@ -58,6 +60,7 @@ android {
 }
 
 dependencies {
+    implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
