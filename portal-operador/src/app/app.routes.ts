@@ -38,5 +38,11 @@ export const routes: Routes = [
       { path: '', pathMatch: 'full', redirectTo: 'mapa' },
     ],
   },
-  { path: '**', redirectTo: '' },
+  
+  {
+    path: 'publico',
+    loadComponent: () =>
+      import('./features/publico/publico').then(m => m.Publico)
+  },
+{ path: '**', redirectTo: '' },
 ];
