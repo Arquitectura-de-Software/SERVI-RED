@@ -11,13 +11,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -27,6 +36,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,7 +45,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.servired.app.core.domain.model.ResumenValidacionComunitaria
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -48,6 +60,13 @@ fun SeguimientoScreen(viewModel: SeguimientoViewModel, reporteIdInicial: String?
 
     var modoReporte by remember { mutableStateOf(true) }
     var codigo by remember { mutableStateOf(reporteIdInicial ?: "") }
+
+    LaunchedEffect(reporteIdInicial) {
+        if (!reporteIdInicial.isNullOrBlank()) {
+            modoReporte = true
+            viewModel.consultarReporte(reporteIdInicial)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -144,13 +163,185 @@ fun SeguimientoScreen(viewModel: SeguimientoViewModel, reporteIdInicial: String?
                     )
                 }
                 is SeguimientoUiState.ReporteEncontrado -> {
+                    if (!state.mensajeConfirmacion.isNullOrBlank()) {
+                        Surface(
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                        ) {
+                            Text(
+                                text = state.mensajeConfirmacion,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
+                    }
+
+                    if (state.resumenValidacion != null) {
+                        ModuloValidacionComunitaria(
+                            resumen = state.resumenValidacion,
+                            procesando = state.procesandoConfirmacion,
+                            onConfirmar = { tipo ->
+                                viewModel.confirmarRestablecimiento(state.resumenValidacion.incidenteId, tipo)
+                            }
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+
+                    Text(
+                        text = "Historial y trazabilidad",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
                     LineaDeTiempoList(entradas = state.lineasTiempo)
                 }
                 is SeguimientoUiState.DenunciaEncontrada -> {
+                    Text(
+                        text = "Historial de la denuncia anónima",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
                     LineaDeTiempoList(entradas = state.lineasTiempo)
                 }
                 else -> {}
             }
+        }
+    }
+}
+
+@Composable
+private fun ModuloValidacionComunitaria(
+    resumen: ResumenValidacionComunitaria,
+    procesando: Boolean,
+    onConfirmar: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Validación comunitaria",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Schedule,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = resumen.duracionFormateada,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "Tu opinión ayuda a verificar si la empresa restableció el servicio o si la zona sigue afectada.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Métricas de votos comunitarios
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "✅ ${resumen.totalRestablecido} confirman restablecido",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF2E7D32),
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "⚠️ ${resumen.totalSinServicio} siguen sin servicio",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFFC62828),
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+            LinearProgressIndicator(
+                progress = { resumen.porcentajeRestablecido },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp),
+                color = Color(0xFF2E7D32),
+                trackColor = Color(0xFFEF9A9A)
+            )
+
+            if (!resumen.miConfirmacion.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Tu confirmación activa: ${if (resumen.miConfirmacion == "restablecido") "Restablecido ✓" else "Sin servicio ✗"}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = { onConfirmar("restablecido") },
+                    enabled = !procesando && resumen.miConfirmacion != "restablecido",
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    if (procesando) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = Color.WHITE,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(
+                            text = if (resumen.miConfirmacion == "restablecido") "Confirmado ✓" else "Tengo servicio",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
+
+                Button(
+                    onClick = { onConfirmar("sin_servicio") },
+                    enabled = !procesando && resumen.miConfirmacion != "sin_servicio",
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = if (resumen.miConfirmacion == "sin_servicio") "Reportado ✗" else "Sin servicio",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+        }
+    }
+}
         }
     }
 }

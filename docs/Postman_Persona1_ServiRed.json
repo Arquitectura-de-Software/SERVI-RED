@@ -1,0 +1,473 @@
+{
+  "info": {
+    "_postman_id": "servi-red-persona1-v1",
+    "name": "ServiRed – Persona 1 (App Móvil)",
+    "description": "Colección de contratos de API para Persona 1: reporte de interrupciones de servicio, consulta de incidentes cercanos, validación comunitaria y detección de duplicados.\n\nVariables de entorno:\n  base_url  = https://dfjbmgzadgvdfswenuef.supabase.co\n  anon_key  = <tu anon key de secrets.properties>\n  access_token = (se llena automáticamente tras el paso de autenticación)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url",     "value": "https://dfjbmgzadgvdfswenuef.supabase.co" },
+    { "key": "anon_key",     "value": "sb_publishable_HwuRceE67mCr1AubpP4gGQ_QpJ93CXy" },
+    { "key": "access_token", "value": "" },
+    { "key": "reporte_id",   "value": "" },
+    { "key": "incidente_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0 – Autenticación",
+      "item": [
+        {
+          "name": "Iniciar sesión anónima (ciudadano)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.access_token) {",
+                  "  pm.collectionVariables.set('access_token', body.access_token);",
+                  "  console.log('access_token guardado:', body.access_token.substring(0,30) + '...');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey",       "value": "{{anon_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": null,\n  \"password\": null\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/v1/signup",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "v1", "signup"]
+            },
+            "description": "Crea una sesión ciudadana anónima. El `access_token` devuelto se guarda automáticamente en la variable de colección y se usa como Bearer token en todas las solicitudes posteriores.\n\n**Prerequisito:** Esta llamada DEBE realizarse antes de cualquier otra, ya que `registrar_reporte` y las demás RPCs requieren rol 'ciudadano'."
+          }
+        }
+      ]
+    },
+    {
+      "name": "1 – Reporte de interrupción",
+      "item": [
+        {
+          "name": "Registrar reporte (normal)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (Array.isArray(body) && body.length > 0) {",
+                  "  pm.collectionVariables.set('reporte_id', body[0].reporte_id);",
+                  "  console.log('reporte_id:', body[0].reporte_id);",
+                  "  console.log('es_duplicado:', body[0].es_duplicado);",
+                  "  console.log('incidente_cercano_id:', body[0].incidente_cercano_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey",        "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Accept",        "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"p_client_request_id\": \"00000000-0000-0000-0000-000000000001\",\n  \"p_servicio_id\": 1,\n  \"p_municipio_codigo\": \"11001\",\n  \"p_lat\": 4.711,\n  \"p_lng\": -74.0721,\n  \"p_descripcion\": \"[Área: Cuadra / Manzana] Sin luz desde las 7pm\",\n  \"p_url_evidencia\": null,\n  \"p_inicio_estimado\": \"2026-11-23T19:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/rest/v1/rpc/registrar_reporte",
+              "host": ["{{base_url}}"],
+              "path": ["rest", "v1", "rpc", "registrar_reporte"]
+            },
+            "description": "Registra un reporte de interrupción de servicio.\n\nCampos de respuesta nuevos (Punto 5):\n- `es_duplicado`: true si el ciudadano ya reportó lo mismo a < 500 m en las últimas 4 h\n- `incidente_cercano_id`: UUID del incidente al que se vinculó automáticamente\n- `incidente_cercano_distancia`: metros de distancia al centroide del incidente\n\n**p_client_request_id** debe ser un UUID único por intento de reporte (garantiza idempotencia)."
+          }
+        },
+        {
+          "name": "Registrar reporte (detectar duplicado)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey",        "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Accept",        "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"p_client_request_id\": \"00000000-0000-0000-0000-000000000002\",\n  \"p_servicio_id\": 1,\n  \"p_municipio_codigo\": \"11001\",\n  \"p_lat\": 4.7112,\n  \"p_lng\": -74.0720,\n  \"p_descripcion\": \"[Área: Mi vivienda] Segundo reporte cercano mismo servicio\",\n  \"p_url_evidencia\": null,\n  \"p_inicio_estimado\": null\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/rest/v1/rpc/registrar_reporte",
+              "host": ["{{base_url}}"],
+              "path": ["rest", "v1", "rpc", "registrar_reporte"]
+            },
+            "description": "Mismo ciudadano, mismo servicio, coordenadas a ~25m del reporte anterior → debe devolver `es_duplicado: true` y retornar el reporte existente sin insertar uno nuevo."
+          }
+        },
+        {
+          "name": "Consultar reporte por ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "apikey",        "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Accept",        "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/rest/v1/reporte?id=eq.{{reporte_id}}&select=id,estado,descripcion,creado_en,incidente_id,url_evidencia,inicio_estimado",
+              "host": ["{{base_url}}"],
+              "path": ["rest", "v1", "reporte"],
+              "query": [
+                { "key": "id",     "value": "eq.{{reporte_id}}" },
+                { "key": "select", "value": "id,estado,descripcion,creado_en,incidente_id,url_evidencia,inicio_estimado" }
+              ]
+            },
+            "description": "Consulta directa sobre la tabla `reporte` por UUID. Requiere que las RLS policies permitan al ciudadano ver sus propios reportes."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 – Consultas geoespaciales",
+      "item": [
+        {
+          "name": "Consultar incidentes cercanos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (Array.isArray(body) && body.length > 0) {",
+                  "  pm.collectionVariables.set('incidente_id', body[0].id);",
+                  "  console.log('incidente_id del primero:', body[0].id, '| distancia:', body[0].distancia_metros, 'm');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey",        "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Accept",        "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"p_lat\": 4.711,\n  \"p_lng\": -74.0721,\n  \"p_radio_metros\": 25000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/rest/v1/rpc/consultar_incidentes_cercanos",
+              "host": ["{{base_url}}"],
+              "path": ["rest", "v1", "rpc", "consultar_incidentes_cercanos"]
+            },
+            "description": "Devuelve incidentes abiertos dentro de `p_radio_metros` metros del punto dado. Usa ST_DWithin con índice GIST en `incidente.centroide`."
+          }
+        },
+        {
+          "name": "Consultar reportes cercanos",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey",        "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Accept",        "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"p_lat\": 4.711,\n  \"p_lng\": -74.0721,\n  \"p_radio_metros\": 5000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/rest/v1/rpc/consultar_reportes_cercanos",
+              "host": ["{{base_url}}"],
+              "path": ["rest", "v1", "rpc", "consultar_reportes_cercanos"]
+            },
+            "description": "Devuelve reportes de ciudadanos dentro del radio especificado (máximo visible según políticas RLS)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 – Validación comunitaria",
+      "item": [
+        {
+          "name": "Registrar confirmación ciudadana (restablecido)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (Array.isArray(body) && body.length > 0) {",
+                  "  console.log('umbral_alcanzado:', body[0].umbral_alcanzado);",
+                  "  console.log('duracion_minutos:', body[0].duracion_minutos);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey",        "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Accept",        "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"p_incidente_id\": \"{{incidente_id}}\",\n  \"p_tipo\": \"restablecido\",\n  \"p_lat\": 4.711,\n  \"p_lng\": -74.0721\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/rest/v1/rpc/registrar_confirmacion_ciudadana",
+              "host": ["{{base_url}}"],
+              "path": ["rest", "v1", "rpc", "registrar_confirmacion_ciudadana"]
+            },
+            "description": "Registra el voto del ciudadano indicando que el servicio fue restablecido. Cuando ≥ 3 votos 'restablecido' son recibidos, el incidente transiciona automáticamente y se calcula `duracion_minutos`.\n\np_tipo acepta: `restablecido` | `sin_servicio`"
+          }
+        },
+        {
+          "name": "Registrar confirmación ciudadana (sin_servicio)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey",        "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Accept",        "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"p_incidente_id\": \"{{incidente_id}}\",\n  \"p_tipo\": \"sin_servicio\",\n  \"p_lat\": 4.711,\n  \"p_lng\": -74.0721\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/rest/v1/rpc/registrar_confirmacion_ciudadana",
+              "host": ["{{base_url}}"],
+              "path": ["rest", "v1", "rpc", "registrar_confirmacion_ciudadana"]
+            }
+          }
+        },
+        {
+          "name": "Consultar resumen de confirmaciones",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey",        "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Accept",        "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"p_incidente_id\": \"{{incidente_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/rest/v1/rpc/consultar_resumen_confirmaciones",
+              "host": ["{{base_url}}"],
+              "path": ["rest", "v1", "rpc", "consultar_resumen_confirmaciones"]
+            },
+            "description": "Devuelve el resumen de votos ciudadanos para un incidente: estado actual, fechas de inicio y restablecimiento, duración en minutos, totales por tipo, y el voto propio del ciudadano autenticado (`mi_confirmacion`)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 – Flujo completo Persona 1 (smoke test)",
+      "item": [
+        {
+          "name": "STEP 1 – Autenticar anónimamente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json();",
+                  "pm.test('access_token presente', () => pm.expect(b.access_token).to.not.be.undefined);",
+                  "pm.collectionVariables.set('access_token', b.access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey",       "value": "{{anon_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":null,\"password\":null}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/v1/signup",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "v1", "signup"]
+            }
+          }
+        },
+        {
+          "name": "STEP 2 – Registrar reporte",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json();",
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('reporte_id existe', () => pm.expect(b[0].reporte_id).to.not.be.empty);",
+                  "pm.test('es_duplicado es boolean', () => pm.expect(b[0].es_duplicado).to.be.a('boolean'));",
+                  "pm.collectionVariables.set('reporte_id', b[0].reporte_id);",
+                  "if (b[0].incidente_cercano_id) pm.collectionVariables.set('incidente_id', b[0].incidente_cercano_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey",        "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Accept",        "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"p_client_request_id\": \"{{$randomUUID}}\",\n  \"p_servicio_id\": 1,\n  \"p_municipio_codigo\": \"11001\",\n  \"p_lat\": 4.711,\n  \"p_lng\": -74.0721,\n  \"p_descripcion\": \"[Área: Cuadra / Manzana] Smoke test\",\n  \"p_inicio_estimado\": null\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/rest/v1/rpc/registrar_reporte",
+              "host": ["{{base_url}}"],
+              "path": ["rest", "v1", "rpc", "registrar_reporte"]
+            }
+          }
+        },
+        {
+          "name": "STEP 3 – Consultar incidentes cercanos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('respuesta es array', () => pm.expect(b).to.be.an('array'));",
+                  "if (b.length > 0) pm.collectionVariables.set('incidente_id', b[0].id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey",        "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Accept",        "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"p_lat\":4.711,\"p_lng\":-74.0721,\"p_radio_metros\":25000}"
+            },
+            "url": {
+              "raw": "{{base_url}}/rest/v1/rpc/consultar_incidentes_cercanos",
+              "host": ["{{base_url}}"],
+              "path": ["rest", "v1", "rpc", "consultar_incidentes_cercanos"]
+            }
+          }
+        },
+        {
+          "name": "STEP 4 – Confirmar restablecimiento",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (!pm.collectionVariables.get('incidente_id')) {",
+                  "  console.warn('incidente_id vacío – omitir este paso');",
+                  "  return;",
+                  "}",
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey",        "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Accept",        "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"p_incidente_id\": \"{{incidente_id}}\",\n  \"p_tipo\": \"restablecido\",\n  \"p_lat\": 4.711,\n  \"p_lng\": -74.0721\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/rest/v1/rpc/registrar_confirmacion_ciudadana",
+              "host": ["{{base_url}}"],
+              "path": ["rest", "v1", "rpc", "registrar_confirmacion_ciudadana"]
+            }
+          }
+        },
+        {
+          "name": "STEP 5 – Resumen de confirmaciones",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (!pm.collectionVariables.get('incidente_id')) { return; }",
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('total_restablecido >= 1', () => pm.expect(b[0].total_restablecido).to.be.at.least(1));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey",        "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Accept",        "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"p_incidente_id\":\"{{incidente_id}}\"}"
+            },
+            "url": {
+              "raw": "{{base_url}}/rest/v1/rpc/consultar_resumen_confirmaciones",
+              "host": ["{{base_url}}"],
+              "path": ["rest", "v1", "rpc", "consultar_resumen_confirmaciones"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

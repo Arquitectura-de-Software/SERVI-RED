@@ -3,12 +3,16 @@ package com.servired.app.core.data.remote
 import android.content.Context
 import com.servired.app.BuildConfig
 import com.servired.app.core.data.local.SessionManager
+import com.servired.app.core.data.remote.dto.ConfirmacionCiudadanaDto
 import com.servired.app.core.data.remote.dto.ConsultaCercanosDto
 import com.servired.app.core.data.remote.dto.ConsultaDenunciaDto
 import com.servired.app.core.data.remote.dto.ConsultaDenunciaResponseDto
+import com.servired.app.core.data.remote.dto.ConsultaResumenDto
 import com.servired.app.core.data.remote.dto.DenunciaDto
 import com.servired.app.core.data.remote.dto.IncidenteCercanoDto
 import com.servired.app.core.data.remote.dto.ReporteDetalleDto
+import com.servired.app.core.data.remote.dto.ResultadoConfirmacionDto
+import com.servired.app.core.data.remote.dto.ResumenConfirmacionesDto
 import com.servired.app.core.data.remote.dto.ReporteDto
 import com.servired.app.core.data.remote.dto.ReporteResponseDto
 import io.ktor.client.HttpClient
@@ -244,6 +248,47 @@ object SupabaseClient {
         }.onFailure {
             // Manejo tolerante a fallos de red
             Result.success(emptyList<IncidenteCercanoDto>())
+        }
+    }
+
+    // Registra una confirmación ciudadana ('restablecido' | 'sin_servicio') y evalúa umbrales
+    suspend fun registrarConfirmacionCiudadana(
+        incidenteId: String,
+        tipo: String,
+        lat: Double? = null,
+        lng: Double? = null
+    ): Result<ResultadoConfirmacionDto> {
+        return runCatching {
+            val response = httpClient.post("$SUPABASE_URL/rest/v1/rpc/registrar_confirmacion_ciudadana") {
+                contentType(ContentType.Application.Json)
+                setBody(ConfirmacionCiudadanaDto(incidenteId = incidenteId, tipo = tipo, lat = lat, lng = lng))
+            }
+            if (response.status == HttpStatusCode.OK) {
+                val list = response.body<List<ResultadoConfirmacionDto>>()
+                list.firstOrNull() ?: throw Exception("Respuesta vacía al confirmar")
+            } else {
+                throw Exception("Error HTTP ${response.status.value}: ${response.body<String>()}")
+            }
+        }.onFailure { e ->
+            Result.failure<ResultadoConfirmacionDto>(Exception("Error de red: ${e.message}", e))
+        }
+    }
+
+    // Consulta métricas comunitarias y duración calculada del incidente
+    suspend fun consultarResumenConfirmaciones(incidenteId: String): Result<ResumenConfirmacionesDto> {
+        return runCatching {
+            val response = httpClient.post("$SUPABASE_URL/rest/v1/rpc/consultar_resumen_confirmaciones") {
+                contentType(ContentType.Application.Json)
+                setBody(ConsultaResumenDto(incidenteId = incidenteId))
+            }
+            if (response.status == HttpStatusCode.OK) {
+                val list = response.body<List<ResumenConfirmacionesDto>>()
+                list.firstOrNull() ?: throw Exception("Incidente no encontrado")
+            } else {
+                throw Exception("Error HTTP ${response.status.value}: ${response.body<String>()}")
+            }
+        }.onFailure { e ->
+            Result.failure<ResumenConfirmacionesDto>(Exception("Error de red: ${e.message}", e))
         }
     }
 }

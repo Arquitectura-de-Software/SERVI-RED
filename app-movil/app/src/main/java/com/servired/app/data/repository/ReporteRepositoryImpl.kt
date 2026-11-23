@@ -5,8 +5,11 @@ import com.servired.app.core.data.local.entity.ReporteEntity
 import com.servired.app.core.data.remote.SupabaseClient
 import com.servired.app.core.data.remote.dto.IncidenteCercanoDto
 import com.servired.app.core.data.remote.dto.ReporteDto
+import com.servired.app.core.data.remote.dto.ResultadoConfirmacionDto
 import com.servired.app.core.data.sync.OutboxSyncWorker
 import com.servired.app.core.domain.model.Reporte
+import com.servired.app.core.domain.model.ReporteCreado
+import com.servired.app.core.domain.model.ResumenValidacionComunitaria
 import com.servired.app.core.domain.model.TipoServicio
 import com.servired.app.core.domain.repository.ReporteRepository
 import com.servired.app.core.network.ConnectivityObserver
@@ -38,7 +41,7 @@ class ReporteRepositoryImpl(
         descripcion: String?,
         urlEvidencia: String?,
         inicioEstimado: String?
-    ): Result<String> {
+    ): Result<ReporteCreado> {
         val id = UUID.randomUUID().toString()
         val clientRequestId = UUID.randomUUID().toString()
 
@@ -59,6 +62,10 @@ class ReporteRepositoryImpl(
         // Offline-first: siempre persiste localmente primero
         dao.insertOrIgnore(entity)
 
+        var esDuplicado = false
+        var incidenteCercanoId: String? = null
+        var incidenteCercanoDistancia: Double? = null
+
         if (connectivityObserver.isCurrentlyConnected()) {
             SupabaseClient.asegurarSesion(context)
             val dto = ReporteDto(
@@ -73,8 +80,12 @@ class ReporteRepositoryImpl(
             )
             val resultado = SupabaseClient.registrarReporte(dto)
             if (resultado.isSuccess) {
+                val respuesta = resultado.getOrNull()
                 dao.marcarSincronizado(id)
-                resultado.getOrNull()?.estado?.let { dao.updateEstado(id, it) }
+                respuesta?.estado?.let { dao.updateEstado(id, it) }
+                esDuplicado = respuesta?.esDuplicado ?: false
+                incidenteCercanoId = respuesta?.incidenteCercanoId
+                incidenteCercanoDistancia = respuesta?.incidenteCercanoDistancia
             } else {
                 OutboxSyncWorker.enqueue(context)
             }
@@ -82,7 +93,14 @@ class ReporteRepositoryImpl(
             OutboxSyncWorker.enqueue(context)
         }
 
-        return Result.success(id)
+        return Result.success(
+            ReporteCreado(
+                reporteId = id,
+                esDuplicado = esDuplicado,
+                incidenteCercanoId = incidenteCercanoId,
+                incidenteCercanoDistancia = incidenteCercanoDistancia
+            )
+        )
     }
 
     override suspend fun consultarPorId(id: String): Result<Reporte> {
@@ -111,7 +129,10 @@ class ReporteRepositoryImpl(
                 estado = dto.estado,
                 pendienteSync = false,
                 creadoEn = parsearFechaIso(dto.creadoEn),
-                intentosSincronizacion = 0
+                intentosSincronizacion = 0,
+                urlEvidencia = dto.urlEvidencia,
+                inicioEstimado = dto.inicioEstimado,
+                incidenteId = dto.incidenteId
             )
         }
     }
@@ -124,6 +145,40 @@ class ReporteRepositoryImpl(
         if (!connectivityObserver.isCurrentlyConnected()) return emptyList()
         SupabaseClient.asegurarSesion(context)
         return SupabaseClient.consultarIncidentesCercanos(lat, lng, radioMetros).getOrDefault(emptyList())
+    }
+
+    override suspend fun registrarConfirmacion(
+        incidenteId: String,
+        tipo: String,
+        lat: Double?,
+        lng: Double?
+    ): Result<ResultadoConfirmacionDto> {
+        if (!connectivityObserver.isCurrentlyConnected()) {
+            return Result.failure(Exception("Sin conexión a internet para confirmar"))
+        }
+        SupabaseClient.asegurarSesion(context)
+        return SupabaseClient.registrarConfirmacionCiudadana(incidenteId, tipo, lat, lng)
+    }
+
+    override suspend fun consultarResumenConfirmaciones(
+        incidenteId: String
+    ): Result<ResumenValidacionComunitaria> {
+        if (!connectivityObserver.isCurrentlyConnected()) {
+            return Result.failure(Exception("Sin conexión a internet"))
+        }
+        SupabaseClient.asegurarSesion(context)
+        return SupabaseClient.consultarResumenConfirmaciones(incidenteId).map { dto ->
+            ResumenValidacionComunitaria(
+                incidenteId = dto.incidenteId,
+                estadoIncidente = dto.estadoIncidente,
+                inicioEn = dto.inicioEn,
+                restablecidoEn = dto.restablecidoEn,
+                duracionMinutos = dto.duracionMinutos,
+                totalRestablecido = dto.totalRestablecido,
+                totalSinServicio = dto.totalSinServicio,
+                miConfirmacion = dto.miConfirmacion
+            )
+        }
     }
 
     private fun parsearFechaIso(fecha: String?): Long {

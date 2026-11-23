@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.servired.app.core.data.remote.SupabaseClient
 import com.servired.app.core.domain.model.Reporte
+import com.servired.app.core.domain.model.ReporteCreado
 import com.servired.app.core.domain.model.TipoServicio
 import com.servired.app.core.domain.repository.ReporteRepository
 import com.servired.app.core.network.ConnectivityObserver
@@ -33,6 +34,11 @@ class ReporteViewModel(
 
     private val _reporteIdCreado = MutableStateFlow<String?>(null)
     val reporteIdCreado: StateFlow<String?> = _reporteIdCreado.asStateFlow()
+
+    // ── Punto 5: metadatos de duplicado/incidente cercano ────────────────────
+    /** Resultado completo del último crearReporte (incluye flags de duplicado). */
+    private val _reporteCreado = MutableStateFlow<ReporteCreado?>(null)
+    val reporteCreado: StateFlow<ReporteCreado?> = _reporteCreado.asStateFlow()
 
     init {
         observarConectividad()
@@ -76,7 +82,9 @@ class ReporteViewModel(
                 inicioEstimado = inicioEstimado
             )
             if (resultado.isSuccess) {
-                _reporteIdCreado.value = resultado.getOrNull()
+                val creado = resultado.getOrNull()!!
+                _reporteCreado.value = creado
+                _reporteIdCreado.value = creado.reporteId
                 cargarReportes()
             } else {
                 _uiState.value = ReporteUiState.Error(
@@ -112,5 +120,7 @@ class ReporteViewModel(
 
     fun limpiarReporteIdCreado() {
         _reporteIdCreado.value = null
+        _reporteCreado.value = null
     }
 }
+

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.servired.app.core.domain.model.Denuncia
 import com.servired.app.core.domain.model.Reporte
+import com.servired.app.core.domain.model.ResumenValidacionComunitaria
 import com.servired.app.core.domain.repository.DenunciaRepository
 import com.servired.app.core.domain.repository.ReporteRepository
 import com.servired.app.core.network.ConnectivityObserver
@@ -24,7 +25,10 @@ sealed class SeguimientoUiState {
     object Loading : SeguimientoUiState()
     data class ReporteEncontrado(
         val reporte: Reporte,
-        val lineasTiempo: List<EntradaLineasTiempo>
+        val lineasTiempo: List<EntradaLineasTiempo>,
+        val resumenValidacion: ResumenValidacionComunitaria? = null,
+        val procesandoConfirmacion: Boolean = false,
+        val mensajeConfirmacion: String? = null
     ) : SeguimientoUiState()
     data class DenunciaEncontrada(
         val denuncia: Denuncia,
@@ -59,16 +63,73 @@ class SeguimientoViewModel(
             val resultado = reporteRepository.consultarPorId(id)
             if (resultado.isSuccess) {
                 val reporte = resultado.getOrNull()!!
+                val resumen = if (!reporte.incidenteId.isNullOrBlank()) {
+                    reporteRepository.consultarResumenConfirmaciones(reporte.incidenteId).getOrNull()
+                } else null
+
                 _uiState.value = SeguimientoUiState.ReporteEncontrado(
                     reporte = reporte,
-                    lineasTiempo = construirLineasTiempoReporte(reporte)
+                    lineasTiempo = construirLineasTiempoReporte(reporte, resumen),
+                    resumenValidacion = resumen
                 )
             } else {
-                _uiState.value = SeguimientoUiState.Error(
-                    resultado.exceptionOrNull()?.message ?: "No se encontró el reporte"
+                // Si falla como ID de reporte, intentar consultar si es un ID de incidente directo
+                val resumenIncidente = reporteRepository.consultarResumenConfirmaciones(id).getOrNull()
+                if (resumenIncidente != null) {
+                    val reporteFicticio = Reporte(
+                        id = resumenIncidente.incidenteId,
+                        clientRequestId = "",
+                        servicio = com.servired.app.core.domain.model.TipoServicio.ENERGIA,
+                        municipioCodigo = "",
+                        lat = 0.0,
+                        lng = 0.0,
+                        descripcion = "Incidente de red consultado directamente",
+                        estado = resumenIncidente.estadoIncidente,
+                        pendienteSync = false,
+                        creadoEn = System.currentTimeMillis(),
+                        intentosSincronizacion = 0,
+                        incidenteId = resumenIncidente.incidenteId
+                    )
+                    _uiState.value = SeguimientoUiState.ReporteEncontrado(
+                        reporte = reporteFicticio,
+                        lineasTiempo = construirLineasTiempoReporte(reporteFicticio, resumenIncidente),
+                        resumenValidacion = resumenIncidente
+                    )
+                } else {
+                    _uiState.value = SeguimientoUiState.Error(
+                        resultado.exceptionOrNull()?.message ?: "No se encontró el reporte o incidente"
+                    )
+                }
+            }
+        }
+    }
+
+    fun confirmarRestablecimiento(incidenteId: String, tipo: String) {
+        val currentState = _uiState.value as? SeguimientoUiState.ReporteEncontrado ?: return
+        viewModelScope.launch {
+            _uiState.value = currentState.copy(procesandoConfirmacion = true, mensajeConfirmacion = null)
+            val resultado = reporteRepository.registrarConfirmacion(incidenteId, tipo)
+            if (resultado.isSuccess) {
+                val res = resultado.getOrNull()
+                val nuevoResumen = reporteRepository.consultarResumenConfirmaciones(incidenteId).getOrNull()
+                _uiState.value = currentState.copy(
+                    procesandoConfirmacion = false,
+                    resumenValidacion = nuevoResumen,
+                    lineasTiempo = construirLineasTiempoReporte(currentState.reporte, nuevoResumen),
+                    mensajeConfirmacion = res?.mensaje ?: "Confirmación registrada con éxito"
+                )
+            } else {
+                _uiState.value = currentState.copy(
+                    procesandoConfirmacion = false,
+                    mensajeConfirmacion = "Error: ${resultado.exceptionOrNull()?.message}"
                 )
             }
         }
+    }
+
+    fun limpiarMensajeConfirmacion() {
+        val currentState = _uiState.value as? SeguimientoUiState.ReporteEncontrado ?: return
+        _uiState.value = currentState.copy(mensajeConfirmacion = null)
     }
 
     fun consultarDenuncia(codigoSeguimiento: String) {
@@ -89,7 +150,10 @@ class SeguimientoViewModel(
         }
     }
 
-    private fun construirLineasTiempoReporte(reporte: Reporte): List<EntradaLineasTiempo> {
+    private fun construirLineasTiempoReporte(
+        reporte: Reporte,
+        resumen: ResumenValidacionComunitaria? = null
+    ): List<EntradaLineasTiempo> {
         val entradas = mutableListOf<EntradaLineasTiempo>()
         entradas.add(
             EntradaLineasTiempo(
@@ -118,6 +182,22 @@ class SeguimientoViewModel(
                     timestamp = System.currentTimeMillis(),
                     estado = "sync_fallido",
                     descripcion = "No se pudo sincronizar tras múltiples intentos"
+                )
+            )
+        }
+
+        if (resumen != null) {
+            val descIncidente = when (resumen.estadoIncidente) {
+                "restablecido" -> "Servicio restablecido. Duración total: ${resumen.duracionFormateada} (${resumen.totalRestablecido} confirmaciones vecinales)."
+                "en_atencion" -> "Cuadrilla en atención. Duración acumulada: ${resumen.duracionFormateada}."
+                "cerrado" -> "Incidente cerrado formalmente tras validación."
+                else -> "Incidente en curso. Duración: ${resumen.duracionFormateada}."
+            }
+            entradas.add(
+                EntradaLineasTiempo(
+                    timestamp = System.currentTimeMillis(),
+                    estado = resumen.estadoIncidente,
+                    descripcion = descIncidente
                 )
             )
         }

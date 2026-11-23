@@ -3,6 +3,7 @@ package com.servired.app.feature.mapa
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.servired.app.core.domain.model.Reporte
+import com.servired.app.core.domain.model.ResumenValidacionComunitaria
 import com.servired.app.core.domain.model.TipoServicio
 import com.servired.app.core.domain.repository.ReporteRepository
 import com.servired.app.core.location.LocationHelper
@@ -19,6 +20,9 @@ data class MapaUiState(
     val reportesLocales: List<Reporte> = emptyList(),
     val elementosVisibles: List<ElementoMapa> = emptyList(),
     val elementoSeleccionado: ElementoMapa? = null,
+    val resumenValidacion: ResumenValidacionComunitaria? = null,
+    val procesandoConfirmacion: Boolean = false,
+    val mensajeConfirmacion: String? = null,
     val servicioFiltro: TipoServicio? = null,
     val soloIncidentes: Boolean = false,
     val radioBusquedaKm: Double = 25.0,
@@ -149,7 +153,58 @@ class MapaViewModel(
     }
 
     fun seleccionarElemento(elemento: ElementoMapa?) {
-        _uiState.update { it.copy(elementoSeleccionado = elemento) }
+        _uiState.update { it.copy(elementoSeleccionado = elemento, resumenValidacion = null, mensajeConfirmacion = null) }
+        if (elemento != null && elemento.esIncidente) {
+            cargarResumenIncidente(elemento.id)
+        }
+    }
+
+    private fun cargarResumenIncidente(incidenteId: String) {
+        viewModelScope.launch {
+            val resultado = reporteRepo.consultarResumenConfirmaciones(incidenteId)
+            if (resultado.isSuccess) {
+                _uiState.update { it.copy(resumenValidacion = resultado.getOrNull()) }
+            }
+        }
+    }
+
+    fun confirmarRestablecimiento(incidenteId: String, tipo: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(procesandoConfirmacion = true, mensajeConfirmacion = null, mensajeError = null) }
+            val userLoc = _uiState.value.userLocation
+            val resultado = reporteRepo.registrarConfirmacion(
+                incidenteId = incidenteId,
+                tipo = tipo,
+                lat = userLoc?.first,
+                lng = userLoc?.second
+            )
+
+            if (resultado.isSuccess) {
+                val res = resultado.getOrNull()
+                _uiState.update {
+                    it.copy(
+                        procesandoConfirmacion = false,
+                        mensajeConfirmacion = res?.mensaje ?: "Confirmación comunitaria guardada con éxito"
+                    )
+                }
+                cargarResumenIncidente(incidenteId)
+                // Si el umbral provocó cambio de estado, refrescar incidentes
+                if (res?.umbralAlcanzado == true && userLoc != null) {
+                    cargarIncidentesRemotos(userLoc.first, userLoc.second)
+                }
+            } else {
+                _uiState.update {
+                    it.copy(
+                        procesandoConfirmacion = false,
+                        mensajeError = resultado.exceptionOrNull()?.message ?: "Error al registrar confirmación"
+                    )
+                }
+            }
+        }
+    }
+
+    fun limpiarMensajeConfirmacion() {
+        _uiState.update { it.copy(mensajeConfirmacion = null) }
     }
 
     fun limpiarError() {

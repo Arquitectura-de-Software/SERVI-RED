@@ -13,5 +13,6 @@ data class Reporte(
     val creadoEn: Long,
     val intentosSincronizacion: Int,
     val urlEvidencia: String? = null,
-    val inicioEstimado: String? = null
+    val inicioEstimado: String? = null,
+    val incidenteId: String? = null
 )

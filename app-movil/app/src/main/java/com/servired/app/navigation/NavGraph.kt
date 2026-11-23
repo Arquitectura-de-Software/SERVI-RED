@@ -67,7 +67,10 @@ fun NavGraph(context: Context, connectivityObserver: ConnectivityObserver) {
         composable(Routes.REPORTE_NUEVO) {
             // El ViewModel se conserva a través de recomposiciones y cambios de configuración
             val viewModel: ReporteViewModel = viewModel(factory = viewModelFactory)
-            ReporteScreen(viewModel = viewModel)
+            ReporteScreen(
+                viewModel = viewModel,
+                onNavigarAMapa = { navController.navigate(Routes.MAPA) }
+            )
         }
 
         composable(

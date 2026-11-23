@@ -25,11 +25,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.ThumbDown
+import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Badge
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,9 +45,12 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -62,6 +71,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.servired.app.core.domain.model.ResumenValidacionComunitaria
 import com.servired.app.core.domain.model.TipoServicio
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -81,6 +91,21 @@ fun MapaScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.mensajeConfirmacion) {
+        uiState.mensajeConfirmacion?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            viewModel.limpiarMensajeConfirmacion()
+        }
+    }
+
+    LaunchedEffect(uiState.mensajeError) {
+        uiState.mensajeError?.let { err ->
+            snackbarHostState.showSnackbar(err)
+            viewModel.limpiarError()
+        }
+    }
 
     // Permisos de ubicación
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -142,6 +167,7 @@ fun MapaScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Mapa de Incidentes", fontWeight = FontWeight.Bold) },
@@ -289,6 +315,9 @@ fun MapaScreen(
                 uiState.elementoSeleccionado?.let { elemento ->
                     TarjetaDetalleElemento(
                         elemento = elemento,
+                        resumen = uiState.resumenValidacion,
+                        procesandoConfirmacion = uiState.procesandoConfirmacion,
+                        onConfirmar = { tipo -> viewModel.confirmarRestablecimiento(elemento.id, tipo) },
                         onCerrar = { viewModel.seleccionarElemento(null) },
                         onVerSeguimiento = { onNavigarASeguimiento(elemento.id) }
                     )
@@ -352,6 +381,9 @@ private fun FiltrosServicioRow(
 @Composable
 private fun TarjetaDetalleElemento(
     elemento: ElementoMapa,
+    resumen: ResumenValidacionComunitaria?,
+    procesandoConfirmacion: Boolean,
+    onConfirmar: (String) -> Unit,
     onCerrar: () -> Unit,
     onVerSeguimiento: () -> Unit
 ) {
@@ -440,6 +472,119 @@ private fun TarjetaDetalleElemento(
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Medium
                 )
+            }
+
+            // Módulo de validación comunitaria para incidentes
+            if (elemento.esIncidente) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Validación comunitaria",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            resumen?.let { r ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Schedule,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = r.duracionFormateada,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Métricas de votos comunitarios
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "✅ ${resumen?.totalRestablecido ?: 0} restablecido",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF2E7D32),
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "⚠️ ${resumen?.totalSinServicio ?: 0} sin servicio",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFFC62828),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+
+                        resumen?.let { r ->
+                            Spacer(modifier = Modifier.height(4.dp))
+                            LinearProgressIndicator(
+                                progress = { r.porcentajeRestablecido },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp),
+                                color = Color(0xFF2E7D32),
+                                trackColor = Color(0xFFEF9A9A)
+                            )
+                        }
+
+                        // Botones de confirmación ciudadana
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { onConfirmar("restablecido") },
+                                enabled = !procesandoConfirmacion && resumen?.miConfirmacion != "restablecido",
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                if (procesandoConfirmacion) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        color = Color.WHITE,
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Text(
+                                        text = if (resumen?.miConfirmacion == "restablecido") "Confirmado ✓" else "Tengo servicio",
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                }
+                            }
+
+                            Button(
+                                onClick = { onConfirmar("sin_servicio") },
+                                enabled = !procesandoConfirmacion && resumen?.miConfirmacion != "sin_servicio",
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = if (resumen?.miConfirmacion == "sin_servicio") "Reportado ✗" else "Sin servicio",
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
